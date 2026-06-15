@@ -1,0 +1,114 @@
+﻿import 'dotenv/config';
+import { z } from 'zod';
+
+const optionalUrl = z.preprocess((value) => (value === '' ? undefined : value), z.string().url().optional());
+const optionalSecret = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(12).optional());
+const optionalString = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional());
+
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  API_HOST: z.string().optional(),
+  API_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  DATABASE_URL: z.string().url(),
+  DIRECT_DATABASE_URL: z.string().url().optional(),
+  APP_URL: z.string().url().default('http://127.0.0.1:5174'),
+  JWT_SECRET: z.string().min(32),
+  REFRESH_TOKEN_SECRET: z.string().min(32),
+  WEBHOOK_SECRET: optionalSecret,
+  STRIPE_SECRET_KEY: optionalSecret,
+  STRIPE_WEBHOOK_SECRET: optionalSecret,
+  GATEWAY_SECRET: optionalSecret,
+  GATEWAY_URL: optionalUrl,
+  WHATSAPP_VERIFY_TOKEN: optionalSecret,
+  WHATSAPP_ACCESS_TOKEN: optionalSecret,
+  WHATSAPP_PHONE_NUMBER_ID: optionalString,
+  WHATSAPP_WABA_ID: optionalString,
+  META_APP_SECRET: optionalSecret,
+  GROQ_API_KEY: optionalSecret,
+  GROQ_MODEL: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional()),
+  EVOLUTION_API_URL: optionalUrl,
+  EVOLUTION_API_KEY: optionalSecret,
+  INTEGRATION_ENCRYPTION_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(32).optional()),
+  MERCADO_PAGO_CLIENT_ID: optionalString,
+  MERCADO_PAGO_CLIENT_SECRET: optionalSecret,
+  MERCADO_PAGO_REDIRECT_URI: optionalUrl,
+  MERCADO_PAGO_WEBHOOK_SECRET: optionalSecret,
+  STONE_CLIENT_ID: optionalString,
+  STONE_CLIENT_SECRET: optionalSecret,
+  STONE_WEBHOOK_SECRET: optionalSecret,
+  PAGBANK_CLIENT_ID: optionalString,
+  PAGBANK_CLIENT_SECRET: optionalSecret,
+  PAGBANK_REDIRECT_URI: optionalUrl,
+  PAGBANK_API_BASE_URL: optionalUrl,
+  PAGBANK_CONNECT_BASE_URL: optionalUrl,
+  PAGBANK_WEBHOOK_SECRET: optionalSecret,
+  CIELO_CLIENT_ID: optionalString,
+  CIELO_CLIENT_SECRET: optionalSecret,
+  CIELO_WEBHOOK_SECRET: optionalSecret,
+  GETNET_CLIENT_ID: optionalString,
+  GETNET_CLIENT_SECRET: optionalSecret,
+  GETNET_WEBHOOK_SECRET: optionalSecret,
+  REDE_CLIENT_ID: optionalString,
+  REDE_CLIENT_SECRET: optionalSecret,
+  REDE_WEBHOOK_SECRET: optionalSecret,
+  TON_CLIENT_ID: optionalString,
+  TON_CLIENT_SECRET: optionalSecret,
+  TON_WEBHOOK_SECRET: optionalSecret,
+  SAFRAPAY_CLIENT_ID: optionalString,
+  SAFRAPAY_CLIENT_SECRET: optionalSecret,
+  SAFRAPAY_WEBHOOK_SECRET: optionalSecret,
+  INFINITEPAY_CLIENT_ID: optionalString,
+  INFINITEPAY_CLIENT_SECRET: optionalSecret,
+  INFINITEPAY_WEBHOOK_SECRET: optionalSecret,
+  DEV_ACCOUNT_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
+  DEV_ACCOUNT_PASSWORD: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(10).optional()),
+});
+
+const forbiddenFrontendSecretKeys = [
+  'VITE_API_GROQ',
+  'VITE_GROQ_API_KEY',
+  'VITE_STRIPE_SECRET_KEY',
+  'VITE_STRIPE_WEBHOOK_SECRET',
+  'VITE_WHATSAPP_ACCESS_TOKEN',
+  'VITE_META_APP_SECRET',
+  'VITE_DATABASE_URL',
+  'VITE_DIRECT_DATABASE_URL',
+  'VITE_JWT_SECRET',
+  'VITE_REFRESH_TOKEN_SECRET',
+  'VITE_WEBHOOK_SECRET',
+  'VITE_GATEWAY_SECRET',
+  'VITE_DEV_ACCOUNT_PASSWORD',
+  'VITE_INTEGRATION_ENCRYPTION_KEY',
+  'VITE_MERCADO_PAGO_CLIENT_SECRET',
+  'VITE_MERCADO_PAGO_WEBHOOK_SECRET',
+  'VITE_STONE_CLIENT_SECRET',
+  'VITE_STONE_WEBHOOK_SECRET',
+  'VITE_PAGBANK_CLIENT_SECRET',
+  'VITE_PAGBANK_WEBHOOK_SECRET',
+  'VITE_CIELO_CLIENT_SECRET',
+  'VITE_CIELO_WEBHOOK_SECRET',
+  'VITE_GETNET_CLIENT_SECRET',
+  'VITE_GETNET_WEBHOOK_SECRET',
+  'VITE_REDE_CLIENT_SECRET',
+  'VITE_REDE_WEBHOOK_SECRET',
+  'VITE_TON_CLIENT_SECRET',
+  'VITE_TON_WEBHOOK_SECRET',
+  'VITE_SAFRAPAY_CLIENT_SECRET',
+  'VITE_SAFRAPAY_WEBHOOK_SECRET',
+  'VITE_INFINITEPAY_CLIENT_SECRET',
+  'VITE_INFINITEPAY_WEBHOOK_SECRET',
+] as const;
+
+const exposedFrontendSecrets = forbiddenFrontendSecretKeys.filter((key) => Boolean(process.env[key]?.trim()));
+if (exposedFrontendSecrets.length) {
+  throw new Error(`Segredos privados nao podem usar prefixo VITE_: ${exposedFrontendSecrets.join(', ')}`);
+}
+
+const parsedEnv = EnvSchema.parse(process.env);
+
+export const env = {
+  ...parsedEnv,
+  API_HOST: parsedEnv.API_HOST ?? (parsedEnv.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'),
+  API_PORT: parsedEnv.PORT ?? parsedEnv.API_PORT ?? 3333,
+};
