@@ -1,10 +1,10 @@
-import { Layers3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import siouLogo from '../../assets/siou-logo.png';
 
 export const AppLogo = ({ to = '/' }: { to?: string }) => (
   <Link to={to} className="flex items-center gap-3">
-    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-neon to-fuchsia-500 shadow-button">
-      <Layers3 className="h-5 w-5 text-white" aria-hidden="true" />
+    <span className="grid h-11 w-11 place-items-center overflow-hidden rounded-2xl border border-neon/25 bg-[#111827] shadow-button">
+      <img src={siouLogo} alt="" className="h-full w-full object-contain" aria-hidden="true" />
     </span>
     <span className="leading-tight">
       <span className="block text-base font-black text-white">SIOU</span>
