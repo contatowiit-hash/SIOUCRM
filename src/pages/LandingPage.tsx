@@ -31,7 +31,11 @@ const benefits = [
     icon: MessageSquareText,
   },
   { title: 'Aniversários automatizados', text: 'Mensagens antes, no dia e depois com benefício configurável.', icon: Cake },
-  { title: 'IA atendente', text: 'Sugestões de resposta, resumo de clientes e próximos passos.', icon: Bot },
+  {
+    title: 'IA atendente',
+    text: 'Pare de perder tempo respondendo cliente, tenha uma IA própria respondendo e sendo configurada por você',
+    icon: Bot,
+  },
   { title: 'Relatórios inteligentes', text: 'Retenção, ticket médio, receita estimada e melhores campanhas.', icon: PieChart },
 ];
 
