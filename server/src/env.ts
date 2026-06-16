@@ -4,6 +4,7 @@ import { z } from 'zod';
 const optionalUrl = z.preprocess((value) => (value === '' ? undefined : value), z.string().url().optional());
 const optionalSecret = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(12).optional());
 const optionalString = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional());
+const appUrl = z.string().url().transform((value) => value.replace(/\/+$/, ''));
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -12,7 +13,7 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).optional(),
   DATABASE_URL: z.string().url(),
   DIRECT_DATABASE_URL: z.string().url().optional(),
-  APP_URL: z.string().url().default('http://127.0.0.1:5174'),
+  APP_URL: appUrl.default('http://127.0.0.1:5174'),
   JWT_SECRET: z.string().min(32),
   REFRESH_TOKEN_SECRET: z.string().min(32),
   WEBHOOK_SECRET: optionalSecret,

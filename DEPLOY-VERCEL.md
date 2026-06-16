@@ -40,15 +40,24 @@ Install Command: npm ci
 
 O arquivo `vercel.json` ja configura o frontend, API, cabecalhos de seguranca e webhooks.
 
+Em `Project Settings > Domains`, adicione:
+
+```text
+www.sioucrm.com
+sioucrm.com
+```
+
+Use `www.sioucrm.com` como dominio principal.
+
 ## Variaveis obrigatorias na Vercel
 
 Cadastre em `Project Settings > Environment Variables`, nos ambientes Production, Preview e Development conforme necessario:
 
 ```text
-VITE_APP_URL=https://seu-dominio.com.br
+VITE_APP_URL=https://www.sioucrm.com
 VITE_API_URL=/api
 NODE_ENV=production
-APP_URL=https://seu-dominio.com.br
+APP_URL=https://www.sioucrm.com
 DATABASE_URL=URL_POOLED_DO_NEON
 DIRECT_DATABASE_URL=URL_DIRETA_DO_NEON
 JWT_SECRET=SEGREDO_ALEATORIO_COM_MAIS_DE_32_CARACTERES
@@ -93,8 +102,8 @@ Nao rode migrations destrutivas automaticamente no build da Vercel.
 Depois que o dominio estiver ativo, configure:
 
 ```text
-Stripe:   https://seu-dominio.com.br/webhooks/stripe
-WhatsApp: https://seu-dominio.com.br/webhooks/whatsapp
+Stripe:   https://www.sioucrm.com/webhooks/stripe
+WhatsApp: https://www.sioucrm.com/webhooks/whatsapp
 ```
 
 O `vercel.json` encaminha `/webhooks/*` para o backend sem enviar a requisicao ao frontend.
@@ -104,7 +113,7 @@ O `vercel.json` encaminha `/webhooks/*` para o backend sem enviar a requisicao a
 Abra:
 
 ```text
-https://seu-dominio.com.br/health
+https://www.sioucrm.com/health
 ```
 
 Resultado esperado:

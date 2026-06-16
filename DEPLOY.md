@@ -18,15 +18,15 @@ O `127.0.0.1` some para usuarios finais.
 Exemplo recomendado:
 
 ```text
-https://seudominio.com.br      -> site do Syntra Food
-https://api.seudominio.com.br  -> backend/API
+https://www.sioucrm.com      -> site do Syntra Food
+https://api.sioucrm.com      -> backend/API, apenas se separar em Railway
 ```
 
 Tambem pode usar:
 
 ```text
-https://app.seudominio.com.br  -> site do Syntra Food
-https://api.seudominio.com.br  -> backend/API
+https://app.sioucrm.com  -> site do Syntra Food
+https://api.sioucrm.com  -> backend/API, apenas se separar em Railway
 ```
 
 ## 1. Comprar ou configurar o dominio
@@ -51,7 +51,7 @@ Variaveis na Railway:
 
 ```text
 NODE_ENV=production
-APP_URL=https://seu-site.vercel.app
+APP_URL=https://www.sioucrm.com
 DATABASE_URL=sua-url-pooled-da-neon
 DIRECT_DATABASE_URL=sua-url-direct-da-neon
 JWT_SECRET=uma-chave-grande-e-secreta
@@ -84,7 +84,7 @@ Tem que aparecer:
 Na Railway, abra o servico do backend e adicione um Custom Domain:
 
 ```text
-api.seudominio.com.br
+api.sioucrm.com
 ```
 
 A Railway vai mostrar um destino CNAME. Copie esse valor.
@@ -101,7 +101,7 @@ Proxy: desligado, se estiver usando Cloudflare
 Depois teste:
 
 ```text
-https://api.seudominio.com.br/health
+https://api.sioucrm.com/health
 ```
 
 Tem que aparecer:
@@ -125,8 +125,8 @@ Output directory: dist
 Variaveis na Vercel:
 
 ```text
-VITE_APP_URL=https://seudominio.com.br
-VITE_API_URL=https://api.seudominio.com.br/api
+VITE_APP_URL=https://www.sioucrm.com
+VITE_API_URL=https://api.sioucrm.com/api
 ```
 
 Nunca coloque `DATABASE_URL`, `JWT_SECRET` ou chaves privadas na Vercel.
@@ -136,8 +136,8 @@ Nunca coloque `DATABASE_URL`, `JWT_SECRET` ou chaves privadas na Vercel.
 Na Vercel, abra o projeto e adicione o dominio:
 
 ```text
-seudominio.com.br
-www.seudominio.com.br
+sioucrm.com
+www.sioucrm.com
 ```
 
 No DNS, normalmente fica assim:
@@ -163,7 +163,7 @@ No arquivo `vercel.json`, o `Content-Security-Policy` precisa permitir a API ofi
 Procure por `connect-src` e garanta que o dominio da API esteja ali:
 
 ```text
-https://api.seudominio.com.br
+https://api.sioucrm.com
 ```
 
 Depois faca novo deploy na Vercel.
@@ -173,15 +173,15 @@ Depois faca novo deploy na Vercel.
 Quando a Vercel der o link final do site, volte na Railway e confira:
 
 ```text
-APP_URL=https://seudominio.com.br
+APP_URL=https://www.sioucrm.com
 ```
 
 Se mudar o dominio do site, atualize esse campo e redeploy o backend.
 
 ## 8. Como saber se esta tudo certo
 
-- Site abre em `https://seudominio.com.br`
-- Backend responde em `https://api.seudominio.com.br/health`
+- Site abre em `https://www.sioucrm.com`
+- Backend responde em `https://api.sioucrm.com/health`
 - Cadastro cria usuario no Neon
 - Login entra no dashboard
 - Clientes, reservas, pedidos e automacoes aparecem nas tabelas da Neon
@@ -194,4 +194,4 @@ www  CNAME  cname.vercel-dns.com
 api  CNAME  valor-gerado-pela-railway
 ```
 
-Se usar Cloudflare, deixe o `api` sem proxy no começo para o SSL da Railway validar sem dor de cabeca.
+Se usar Cloudflare, deixe o `api` sem proxy no comeco para o SSL da Railway validar sem dor de cabeca.
