@@ -25,7 +25,11 @@ const benefits = [
     icon: Users,
   },
   { title: 'Reservas automáticas', text: 'Confirmações, lembretes e visão do dia em uma tela rápida.', icon: CalendarCheck },
-  { title: 'Campanhas no WhatsApp', text: 'Segmentos inteligentes para VIPs, inativos, cupons e eventos.', icon: MessageSquareText },
+  {
+    title: 'Campanhas no WhatsApp',
+    text: 'Traga clientes antigos de volta automaticamente pelo WhatsApp, gere movimento e vendas em seu restaurante',
+    icon: MessageSquareText,
+  },
   { title: 'Aniversários automatizados', text: 'Mensagens antes, no dia e depois com benefício configurável.', icon: Cake },
   { title: 'IA atendente', text: 'Sugestões de resposta, resumo de clientes e próximos passos.', icon: Bot },
   { title: 'Relatórios inteligentes', text: 'Retenção, ticket médio, receita estimada e melhores campanhas.', icon: PieChart },
