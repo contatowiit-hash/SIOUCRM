@@ -127,15 +127,7 @@ export const DashboardPage = () => {
   const ordersToday = orders.length || (demoMode ? 12 : 0);
   const revenueToday = revenue || (demoMode ? 1356 : 0);
 
-  const demoConversationPreviews = [
-    'Queria reservar uma mesa para hoje à noite.',
-    'Vocês entregam no Centro?',
-    'Pode separar meu pedido para retirada?',
-    'Qual é a sobremesa mais pedida?',
-    'Obrigado pelo atendimento!',
-  ];
-
-  const realRecentConversations = conversations.slice(0, 5).map((conversation) => {
+  const recentConversations = conversations.slice(0, 5).map((conversation) => {
     const lastMessage = conversation.messages.at(-1);
     const answeredByAi = lastMessage?.direction === 'outbound' && lastMessage.provider === 'groq_ai';
     return {
@@ -147,19 +139,6 @@ export const DashboardPage = () => {
       status: lastMessage?.direction === 'inbound' ? 'waiting' : answeredByAi ? 'ai' : 'answered',
     };
   });
-
-  const demoRecentConversations = demoMode
-    ? customers.slice(0, 5).map((customer, index) => ({
-          id: customer.id,
-          name: customer.name,
-          preview: demoConversationPreviews[index] || customer.notes || 'Conversa recente',
-          time: ['11:42', '10:18', '09:55', '09:21', '08:47'][index] || '',
-          avatar: customer.avatar_url,
-          status: index === 0 ? 'waiting' : index === 1 ? 'ai' : 'answered',
-        }))
-    : [];
-
-  const recentConversations = realRecentConversations.length > 0 ? realRecentConversations : demoRecentConversations;
 
   const visibleReservations = [...reservations]
     .sort((a, b) => a.reservation_time.localeCompare(b.reservation_time))
