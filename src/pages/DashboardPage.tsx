@@ -135,28 +135,31 @@ export const DashboardPage = () => {
     'Obrigado pelo atendimento!',
   ];
 
-  const recentConversations =
-    conversations.length > 0
-      ? conversations.slice(0, 5).map((conversation) => {
-          const lastMessage = conversation.messages.at(-1);
-          const answeredByAi = lastMessage?.direction === 'outbound' && lastMessage.provider === 'groq_ai';
-          return {
-            id: conversation.id,
-            name: conversation.customer_name,
-            preview: lastMessage?.body || 'Conversa iniciada',
-            time: formatTime(conversation.last_message_at),
-            avatar: conversation.avatar_url,
-            status: lastMessage?.direction === 'inbound' ? 'waiting' : answeredByAi ? 'ai' : 'answered',
-          };
-        })
-      : customers.slice(0, 5).map((customer, index) => ({
+  const realRecentConversations = conversations.slice(0, 5).map((conversation) => {
+    const lastMessage = conversation.messages.at(-1);
+    const answeredByAi = lastMessage?.direction === 'outbound' && lastMessage.provider === 'groq_ai';
+    return {
+      id: conversation.id,
+      name: conversation.customer_name,
+      preview: lastMessage?.body || 'Conversa iniciada',
+      time: formatTime(conversation.last_message_at),
+      avatar: conversation.avatar_url,
+      status: lastMessage?.direction === 'inbound' ? 'waiting' : answeredByAi ? 'ai' : 'answered',
+    };
+  });
+
+  const demoRecentConversations = demoMode
+    ? customers.slice(0, 5).map((customer, index) => ({
           id: customer.id,
           name: customer.name,
           preview: demoConversationPreviews[index] || customer.notes || 'Conversa recente',
           time: ['11:42', '10:18', '09:55', '09:21', '08:47'][index] || '',
           avatar: customer.avatar_url,
           status: index === 0 ? 'waiting' : index === 1 ? 'ai' : 'answered',
-        }));
+        }))
+    : [];
+
+  const recentConversations = realRecentConversations.length > 0 ? realRecentConversations : demoRecentConversations;
 
   const visibleReservations = [...reservations]
     .sort((a, b) => a.reservation_time.localeCompare(b.reservation_time))

@@ -335,6 +335,15 @@ test('Meu Plano usa linguagem humana sem termos tecnicos', async () => {
   assert.match(page, /Vou|Valor extra até agora|Sem cobrança adicional/);
 });
 
+test('dashboard real nao inventa conversas recentes a partir de clientes', async () => {
+  const dashboard = await read('src/pages/DashboardPage.tsx');
+
+  assert.match(dashboard, /const realRecentConversations = conversations\.slice\(0, 5\)\.map/);
+  assert.match(dashboard, /const demoRecentConversations = demoMode/);
+  assert.match(dashboard, /const recentConversations = realRecentConversations\.length > 0 \? realRecentConversations : demoRecentConversations/);
+  assert.doesNotMatch(dashboard, /conversations\.length > 0[\s\S]*:\s*customers\.slice\(0, 5\)\.map/);
+});
+
 test('WhatsApp aplica protecoes contra spam e respeita pedido para parar', async () => {
   const safety = await read('server/src/services/whatsappSafety.ts');
   const routes = await read('server/src/routes/whatsapp.ts');
