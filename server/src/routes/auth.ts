@@ -32,16 +32,27 @@ const clearRefreshCookie = (reply: FastifyReply) =>
   });
 
 const trustedBrowserOrigins = new Set([new URL(env.APP_URL).origin]);
+trustedBrowserOrigins.add('https://www.sioucrm.com');
+trustedBrowserOrigins.add('https://sioucrm.com');
 if (env.NODE_ENV !== 'production') {
   trustedBrowserOrigins.add('http://127.0.0.1:5174');
   trustedBrowserOrigins.add('http://localhost:5174');
 }
 
+const firstHeaderValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.split(',')[0]?.trim();
+
+const requestOrigin = (request: FastifyRequest) => {
+  const host = firstHeaderValue(request.headers['x-forwarded-host']) ?? firstHeaderValue(request.headers.host);
+  const protocol = firstHeaderValue(request.headers['x-forwarded-proto']) ?? (request.protocol || 'http');
+  return host ? `${protocol}://${host}` : null;
+};
+
 const requireTrustedBrowserOrigin: preHandlerHookHandler = async (request: FastifyRequest, reply: FastifyReply) => {
   const origin = request.headers.origin;
   if (origin) {
     try {
-      if (!trustedBrowserOrigins.has(new URL(origin).origin)) {
+      const normalizedOrigin = new URL(origin).origin;
+      if (!trustedBrowserOrigins.has(normalizedOrigin) && normalizedOrigin !== requestOrigin(request)) {
         return reply.code(403).send({ error: 'Forbidden' });
       }
       return;

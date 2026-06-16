@@ -25,6 +25,8 @@ import { secureLoggerOptions } from './utils/logger.js';
 const permissionsPolicy =
   'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
 
+const productionOrigins = ['https://www.sioucrm.com', 'https://sioucrm.com'];
+
 export const buildApp = async () => {
   const app = fastify({
     logger: secureLoggerOptions,
@@ -47,7 +49,7 @@ export const buildApp = async () => {
       directives: {
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
-        connectSrc: ["'self'", env.APP_URL],
+        connectSrc: ["'self'", env.APP_URL, ...productionOrigins],
         frameAncestors: ["'none'"],
         formAction: ["'self'", 'https://checkout.stripe.com'],
         imgSrc: ["'self'", 'data:', 'https://*.whatsapp.net', 'https://*.fbcdn.net'],
@@ -64,7 +66,7 @@ export const buildApp = async () => {
 
   await app.register(cors, {
     origin: (origin, callback) => {
-      const allowed = new Set([env.APP_URL]);
+      const allowed = new Set([env.APP_URL, ...productionOrigins]);
       if (env.NODE_ENV !== 'production') {
         allowed.add('http://127.0.0.1:5174');
         allowed.add('http://localhost:5174');

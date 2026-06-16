@@ -153,6 +153,9 @@ test('rotas de autenticacao validam origem do navegador', async () => {
 
   assert.match(auth, /requireTrustedBrowserOrigin/);
   assert.match(auth, /sec-fetch-site/);
+  assert.match(auth, /trustedBrowserOrigins\.add\('https:\/\/www\.sioucrm\.com'\)/);
+  assert.match(auth, /trustedBrowserOrigins\.add\('https:\/\/sioucrm\.com'\)/);
+  assert.match(auth, /normalizedOrigin !== requestOrigin\(request\)/);
   assert.match(auth, /const origin = request\.headers\.origin;[\s\S]*if \(origin\)[\s\S]*trustedBrowserOrigins\.has[\s\S]*const secFetchSite = request\.headers\['sec-fetch-site'\]/);
   assert.match(auth, /\/auth\/refresh'.*requireTrustedBrowserOrigin/s);
   assert.match(auth, /\/auth\/logout'.*requireTrustedBrowserOrigin/s);
