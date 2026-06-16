@@ -19,7 +19,11 @@ import { Card } from '../components/ui/Card';
 import { customersByMonth, ordersByCategory } from '../data/demo';
 
 const benefits = [
-  { title: 'Clientes organizados', text: 'CRM com histórico, tags, preferências e score de fidelidade.', icon: Users },
+  {
+    title: 'Clientes organizados',
+    text: 'Nunca mais perca o histórico dos seus melhores clientes, saiba cada detalhe que vende em seu restaurante.',
+    icon: Users,
+  },
   { title: 'Reservas automáticas', text: 'Confirmações, lembretes e visão do dia em uma tela rápida.', icon: CalendarCheck },
   { title: 'Campanhas no WhatsApp', text: 'Segmentos inteligentes para VIPs, inativos, cupons e eventos.', icon: MessageSquareText },
   { title: 'Aniversários automatizados', text: 'Mensagens antes, no dia e depois com benefício configurável.', icon: Cake },
