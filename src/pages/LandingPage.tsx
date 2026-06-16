@@ -169,7 +169,7 @@ export const LandingPage = () => (
               CRM seguro, multi-tenant e pronto para escala
             </div>
             <h1 className="text-4xl font-black leading-tight text-white md:text-6xl">
-              Seu restaurante vendendo mais com CRM, IA e WhatsApp.
+              Aumente as vendas do seu restaurante e recupere clientes antigos
             </h1>
             <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
               Organize clientes, automatize reservas, envie campanhas e recupere clientes antigos com uma plataforma
