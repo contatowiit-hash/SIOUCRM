@@ -1,4 +1,4 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -32,6 +32,34 @@ const checkoutPriceByPlan = {
   lifetime: STRIPE_LIFETIME_PRICE_ID,
   founder_lifetime: STRIPE_FOUNDER_LIFETIME_PRICE_ID,
 } as const;
+
+const trustedCheckoutOrigins = new Set([new URL(env.APP_URL).origin, 'https://www.sioucrm.com', 'https://sioucrm.com']);
+if (env.NODE_ENV !== 'production') {
+  trustedCheckoutOrigins.add('http://127.0.0.1:5174');
+  trustedCheckoutOrigins.add('http://localhost:5174');
+}
+
+const firstHeaderValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.split(',')[0]?.trim();
+
+const trustedOrigin = (value: string | null | undefined) => {
+  if (!value) return null;
+  try {
+    const origin = new URL(value).origin;
+    return trustedCheckoutOrigins.has(origin) ? origin : null;
+  } catch {
+    return null;
+  }
+};
+
+const checkoutAppUrl = (request: FastifyRequest) => {
+  const origin = trustedOrigin(firstHeaderValue(request.headers.origin));
+  if (origin) return origin;
+
+  const host = firstHeaderValue(request.headers['x-forwarded-host']) ?? firstHeaderValue(request.headers.host);
+  const protocol = firstHeaderValue(request.headers['x-forwarded-proto']) ?? (request.protocol || 'http');
+  const requestUrl = host ? trustedOrigin(`${protocol}://${host}`) : null;
+  return requestUrl ?? new URL(env.APP_URL).origin;
+};
 
 let overagePriceValidationCache: { checkedAt: number; valid: boolean } | null = null;
 
@@ -77,10 +105,12 @@ const createCheckoutSession = async ({
   restaurantId,
   email,
   plan,
+  appUrl,
 }: {
   restaurantId: string;
   email: string;
   plan: keyof typeof checkoutPriceByPlan;
+  appUrl: string;
 }) => {
   if (!env.STRIPE_SECRET_KEY) {
     throw new Error('Stripe nao configurado');
@@ -91,8 +121,8 @@ const createCheckoutSession = async ({
     mode,
     client_reference_id: restaurantId,
     customer_email: email,
-    success_url: `${env.APP_URL}/app/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${env.APP_URL}/app/planos?checkout=cancelled`,
+    success_url: `${appUrl}/app/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${appUrl}/app/planos?checkout=cancelled`,
     'line_items[0][price]': checkoutPriceByPlan[plan],
     'line_items[0][quantity]': '1',
     'metadata[restaurantId]': restaurantId,
@@ -309,6 +339,7 @@ export const billingRoutes = async (app: FastifyInstance) => {
         restaurantId: auth.restaurantId,
         email: auth.email,
         plan: parsed.data.plan,
+        appUrl: checkoutAppUrl(request),
       });
 
       if (!session.meteredBillingEnabled && parsed.data.plan !== 'lifetime' && parsed.data.plan !== 'founder_lifetime') {

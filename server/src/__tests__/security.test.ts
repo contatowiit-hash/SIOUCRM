@@ -116,6 +116,17 @@ test('Stripe checkout inclui precos de excedente nas assinaturas', async () => {
   assert.doesNotMatch(billing, /line_items\[1\]\[quantity\]|line_items\[2\]\[quantity\]/);
 });
 
+test('Stripe checkout usa dominio confiavel da requisicao para voltar ao site', async () => {
+  const billing = await read('server/src/routes/billing.ts');
+
+  assert.match(billing, /trustedCheckoutOrigins/);
+  assert.match(billing, /https:\/\/www\.sioucrm\.com/);
+  assert.match(billing, /const checkoutAppUrl = \(request: FastifyRequest\)/);
+  assert.match(billing, /success_url: `\$\{appUrl\}\/app\/planos\?checkout=success/);
+  assert.match(billing, /cancel_url: `\$\{appUrl\}\/app\/planos\?checkout=cancelled`/);
+  assert.doesNotMatch(billing, /success_url: `\$\{env\.APP_URL\}\/app\/planos/);
+});
+
 test('headers de seguranca fortes e cache privado estao configurados', async () => {
   const app = await read('server/src/app.ts');
   const staticServer = await read('server/local-static.cjs');
