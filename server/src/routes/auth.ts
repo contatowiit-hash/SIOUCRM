@@ -38,19 +38,20 @@ if (env.NODE_ENV !== 'production') {
 }
 
 const requireTrustedBrowserOrigin: preHandlerHookHandler = async (request: FastifyRequest, reply: FastifyReply) => {
-  const secFetchSite = request.headers['sec-fetch-site'];
-  if (secFetchSite === 'cross-site') {
-    return reply.code(403).send({ error: 'Forbidden' });
-  }
-
   const origin = request.headers.origin;
-  if (!origin) return;
-
-  try {
-    if (!trustedBrowserOrigins.has(new URL(origin).origin)) {
+  if (origin) {
+    try {
+      if (!trustedBrowserOrigins.has(new URL(origin).origin)) {
+        return reply.code(403).send({ error: 'Forbidden' });
+      }
+      return;
+    } catch {
       return reply.code(403).send({ error: 'Forbidden' });
     }
-  } catch {
+  }
+
+  const secFetchSite = request.headers['sec-fetch-site'];
+  if (secFetchSite === 'cross-site') {
     return reply.code(403).send({ error: 'Forbidden' });
   }
 };

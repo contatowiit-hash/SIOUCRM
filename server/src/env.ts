@@ -61,6 +61,8 @@ const EnvSchema = z.object({
   INFINITEPAY_CLIENT_ID: optionalString,
   INFINITEPAY_CLIENT_SECRET: optionalSecret,
   INFINITEPAY_WEBHOOK_SECRET: optionalSecret,
+  GOOMER_PARTNER_KEY: optionalSecret,
+  GOOMER_PARTNER_TOKEN: optionalSecret,
   DEV_ACCOUNT_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   DEV_ACCOUNT_PASSWORD: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(10).optional()),
 });
@@ -98,6 +100,8 @@ const forbiddenFrontendSecretKeys = [
   'VITE_SAFRAPAY_WEBHOOK_SECRET',
   'VITE_INFINITEPAY_CLIENT_SECRET',
   'VITE_INFINITEPAY_WEBHOOK_SECRET',
+  'VITE_GOOMER_PARTNER_KEY',
+  'VITE_GOOMER_PARTNER_TOKEN',
 ] as const;
 
 const exposedFrontendSecrets = forbiddenFrontendSecretKeys.filter((key) => Boolean(process.env[key]?.trim()));

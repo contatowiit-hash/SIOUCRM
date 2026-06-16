@@ -7,8 +7,16 @@ import { env } from '../../env.js';
 import { normalizeMercadoPagoPayment, verifyMercadoPagoSignature } from '../../integrations/payments/mercado_pago/adapter.js';
 import { getMercadoPagoPayment } from '../../integrations/payments/mercado_pago/client.js';
 import { pdvAdapters, pdvProviders, type PdvProvider } from '../../integrations/pdv/index.js';
+import { normalizeGoomerOrderPayload, parseGoomerEvent } from '../../integrations/pdv/goomer/adapter.js';
+import {
+  fetchGoomerOrder,
+  parseGoomerCredentials,
+  refreshGoomerCredentialsIfNeeded,
+  serializeGoomerCredentials,
+  verifyGoomerWebhookSignature,
+} from '../../integrations/pdv/goomer/client.js';
 import { upsertNormalizedTransaction } from '../../services/transactions.js';
-import { decryptIntegrationSecret } from '../../utils/integrationCrypto.js';
+import { decryptIntegrationSecret, encryptIntegrationSecret } from '../../utils/integrationCrypto.js';
 import { safeEqual } from '../../utils/security.js';
 import {
   getRemainingProviderConfig,
@@ -67,6 +75,61 @@ export const integrationWebhookRoutes = async (app: FastifyInstance) => {
       .where(and(eq(pdvConnections.id, connectionId), eq(pdvConnections.provider, provider), eq(pdvConnections.status, 'connected')))
       .limit(1);
     if (!connection?.integrationToken) return reply.code(404).send({ error: 'Not found' });
+    if (provider === 'goomer') {
+      let credentials;
+      try {
+        credentials = parseGoomerCredentials(decryptIntegrationSecret(connection.integrationToken));
+      } catch {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const rawBody = getRawBody(request);
+      if (!verifyGoomerWebhookSignature(rawBody, getHeader(request, 'x-app-signature'), credentials.clientSecret)) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      try {
+        const event = parseGoomerEvent(request.body);
+        const fresh = await refreshGoomerCredentialsIfNeeded(credentials);
+        if (fresh.refreshed) {
+          await db
+            .update(pdvConnections)
+            .set({
+              integrationToken: encryptIntegrationSecret(serializeGoomerCredentials(fresh.credentials)),
+              updatedAt: new Date(),
+            })
+            .where(eq(pdvConnections.id, connection.id));
+        }
+
+        const order = await fetchGoomerOrder(event.orderId, fresh.credentials.accessToken!);
+        const transaction = normalizeGoomerOrderPayload(order, connection.restaurantId, event.eventType);
+        await upsertNormalizedTransaction(transaction);
+        await db
+          .update(pdvConnections)
+          .set({ lastEventAt: new Date(), lastError: null, updatedAt: new Date() })
+          .where(eq(pdvConnections.id, connection.id));
+        request.log.info(
+          {
+            provider,
+            restaurantId: connection.restaurantId,
+            eventId: event.eventId,
+            eventType: event.eventType,
+            externalSaleId: transaction.externalSaleId,
+            result: 'ok',
+          },
+          'pdv event processed',
+        );
+        return { received: true };
+      } catch (error) {
+        await db
+          .update(pdvConnections)
+          .set({ status: 'error', lastError: 'Nao foi possivel ler a ultima venda recebida.', updatedAt: new Date() })
+          .where(eq(pdvConnections.id, connection.id));
+        request.log.error({ err: error, provider, restaurantId: connection.restaurantId }, 'pdv event failed');
+        return reply.code(422).send({ error: 'Evento invalido.' });
+      }
+    }
+
     try {
       const receivedToken = getProviderToken(request);
       const expectedToken = decryptIntegrationSecret(connection.integrationToken);

@@ -13,6 +13,8 @@ process.env.INTEGRATION_ENCRYPTION_KEY ??= 'test-integration-encryption-key-with
 
 const { encryptIntegrationSecret, decryptIntegrationSecret } = await import('../utils/integrationCrypto.js');
 const { normalizeGenericPdvPayload } = await import('../integrations/pdv/shared/normalize.js');
+const { normalizeGoomerOrderPayload } = await import('../integrations/pdv/goomer/adapter.js');
+const { verifyGoomerWebhookSignature } = await import('../integrations/pdv/goomer/client.js');
 const { verifyMercadoPagoSignature } = await import('../integrations/payments/mercado_pago/adapter.js');
 
 const root = process.cwd();
@@ -55,6 +57,53 @@ test('adapter de PDV usa restaurantId confiável fornecido pela conexão', () =>
   assert.equal(transaction.paymentStatus, 'paid');
 });
 
+test('Goomer valida webhook por assinatura HMAC do corpo bruto', () => {
+  const rawBody = JSON.stringify({
+    eventId: crypto.randomUUID(),
+    eventType: 'CREATED',
+    orderId: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+  });
+  const secret = 'goomer-client-secret-example';
+  const signature = createHmac('sha256', secret).update(rawBody).digest('hex');
+
+  assert.equal(verifyGoomerWebhookSignature(rawBody, signature, secret), true);
+  assert.equal(verifyGoomerWebhookSignature(`${rawBody}x`, signature, secret), false);
+});
+
+test('Goomer usa OAuth client_credentials em formulario e cache de 7 dias', async () => {
+  const client = await read('server/src/integrations/pdv/goomer/client.ts');
+
+  assert.match(client, /application\/x-www-form-urlencoded/);
+  assert.match(client, /grant_type:\s*'client_credentials'/);
+  assert.match(client, /TOKEN_CACHE_TTL_MS\s*=\s*7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(client, /accessTokenCacheUntil/);
+  assert.match(client, /validateGoomerCredentials/);
+  assert.doesNotMatch(client, /application\/json/);
+});
+
+test('Goomer normaliza pedido OpenDelivery sem confiar no restaurante do payload', () => {
+  const trustedRestaurantId = crypto.randomUUID();
+  const transaction = normalizeGoomerOrderPayload(
+    {
+      id: 'goomer-order-1',
+      createdAt: '2026-06-15T10:00:00.000Z',
+      total: { orderAmount: { value: 89.9, currency: 'BRL' } },
+      payments: { prepaid: 89.9, pending: 0, methods: [{ method: 'PIX', type: 'PREPAID' }] },
+      items: [{ name: 'Pizza Calabresa', quantity: 2, totalPrice: { value: 79.8, currency: 'BRL' } }],
+    },
+    trustedRestaurantId,
+    'CREATED',
+  );
+
+  assert.equal(transaction.restaurantId, trustedRestaurantId);
+  assert.equal(transaction.externalSaleId, 'goomer-order-1');
+  assert.equal(transaction.totalAmount, 89.9);
+  assert.equal(transaction.paymentMethod, 'pix');
+  assert.equal(transaction.paymentStatus, 'paid');
+  assert.equal(transaction.items?.[0]?.name, 'Pizza Calabresa');
+});
+
 test('rotas de integração não retornam tokens e restringem alterações ao owner', async () => {
   const routes = await read('server/src/routes/integrations.ts');
   assert.match(routes, /select\(\{ provider: paymentConnections\.provider, status: paymentConnections\.status/);
@@ -63,6 +112,7 @@ test('rotas de integração não retornam tokens e restringem alterações ao ow
   assert.doesNotMatch(routes, /access_token:\s*connection\.accessToken/);
   assert.match(routes, /payments\/:provider\/connect'.*requireRoles\('owner'\)/s);
   assert.match(routes, /pdv\/:provider\/connect'.*requireRoles\('owner'\)/s);
+  assert.match(routes, /pdv\/:provider\/test'.*requireRoles\('owner'\)/s);
   assert.match(routes, /payments\/:provider\/disconnect'.*requireRoles\('owner'\)/s);
 });
 
@@ -71,6 +121,8 @@ test('webhooks resolvem restaurante pela conexão e rejeitam token inválido', a
   assert.match(route, /eq\(pdvConnections\.id, connectionId\)/);
   assert.match(route, /connection\.restaurantId/);
   assert.match(route, /safeEqual\(receivedToken, expectedToken\)/);
+  assert.match(route, /verifyGoomerWebhookSignature/);
+  assert.match(route, /fetchGoomerOrder/);
   assert.doesNotMatch(route, /restaurant_id.*request\.body/s);
 });
 
@@ -101,7 +153,9 @@ test('provedores principais usam credencial própria criptografada do restaurant
   }
   assert.match(routes, /encryptIntegrationSecret\(accessSecret\)/);
   assert.match(routes, /payments\/:provider\/test/);
+  assert.match(routes, /pdv\/:provider\/test/);
   assert.match(panel, /Salvar conexão/);
+  assert.match(panel, /Testar conexao/);
   assert.match(panel, /Trocar códigos/);
   assert.match(panel, /Os códigos ficam protegidos/);
   assert.doesNotMatch(panel, /MERCADO_PAGO_CLIENT_SECRET/);

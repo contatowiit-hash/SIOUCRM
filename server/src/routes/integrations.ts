@@ -13,6 +13,12 @@ import {
 } from '../utils/integrationCrypto.js';
 import { exchangeMercadoPagoCode } from '../integrations/payments/mercado_pago/client.js';
 import { exchangePagBankCode } from '../integrations/payments/pagbank/client.js';
+import {
+  createGoomerCredentials,
+  parseGoomerCredentials,
+  serializeGoomerCredentials,
+  validateGoomerCredentials,
+} from '../integrations/pdv/goomer/client.js';
 import { writeAuditLog } from '../utils/audit.js';
 import { getRemainingProviderConfig, remainingPaymentProviders, type RemainingPaymentProvider } from '../integrations/payments/index.js';
 import {
@@ -26,6 +32,12 @@ const paymentProviders = ['mercado_pago', ...remainingPaymentProviders] as const
 const paymentProviderSchema = z.enum(paymentProviders);
 const pdvProviderSchema = z.enum(pdvProviders);
 const pdvConnectSchema = z.object({ token: z.string().trim().min(8).max(1000) });
+const goomerConnectSchema = z
+  .object({
+    client_id: z.string().trim().min(2).max(1000),
+    client_secret: z.string().trim().min(8).max(4000),
+  })
+  .strict();
 const infinitePayConnectSchema = z.object({ handle: z.string().trim().min(2).max(120).regex(/^[a-zA-Z0-9._-]+$/) });
 const callbackSchema = z.object({ code: z.string().min(4).max(2000), state: z.string().min(10).max(4000) });
 const ownCredentialProviders = ['mercado_pago', 'pagbank', 'cielo', 'getnet'] as const;
@@ -140,9 +152,9 @@ export const integrationRoutes = async (app: FastifyInstance) => {
             row?.status === 'error'
               ? 'Verifique sua credencial.'
               : ownCredentialProviders.includes(provider as OwnCredentialProvider) && !providerConfigured
-                ? 'O armazenamento seguro de credenciais ainda não foi configurado.'
+                ? 'O armazenamento seguro de credenciais ainda nao foi configurado.'
                   : !providerConfigured
-                    ? 'Esta adquirente exige liberação da conta de parceiro antes da conexão.'
+                    ? 'Esta adquirente exige liberacao da conta de parceiro antes da conexao.'
                     : null,
         };
       }),
@@ -164,14 +176,14 @@ export const integrationRoutes = async (app: FastifyInstance) => {
 
   app.post('/integrations/payments/:provider/connect', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const parsed = paymentProviderSchema.safeParse((request.params as { provider?: string }).provider);
-    if (!parsed.success) return reply.code(404).send({ error: 'Integração não encontrada.' });
+    if (!parsed.success) return reply.code(404).send({ error: 'Integracao nao encontrada.' });
     if (ownCredentialProviders.includes(parsed.data as OwnCredentialProvider)) {
       if (!env.INTEGRATION_ENCRYPTION_KEY) {
-        return reply.code(503).send({ error: 'O armazenamento seguro de credenciais ainda não foi configurado.' });
+        return reply.code(503).send({ error: 'O armazenamento seguro de credenciais ainda nao foi configurado.' });
       }
       const provider = parsed.data as OwnCredentialProvider;
       const credentials = parseOwnCredentials(provider, request.body);
-      if (!credentials) return reply.code(400).send({ error: 'Confira os códigos informados.' });
+      if (!credentials) return reply.code(400).send({ error: 'Confira os codigos informados.' });
       const [existing] = await db
         .select({ id: paymentConnections.id })
         .from(paymentConnections)
@@ -266,19 +278,19 @@ export const integrationRoutes = async (app: FastifyInstance) => {
     }
     if (parsed.data !== 'mercado_pago') {
       const config = getRemainingProviderConfig(parsed.data);
-      if (!config.configured) return reply.code(409).send({ error: 'A adquirente ainda não liberou as credenciais de parceiro.' });
+      if (!config.configured) return reply.code(409).send({ error: 'A adquirente ainda nao liberou as credenciais de parceiro.' });
       return {
         action: 'contact_support',
-        message: `${config.name} exige a conclusão do cadastro de parceiro antes de conectar a conta.`,
+        message: `${config.name} exige a conclusao do cadastro de parceiro antes de conectar a conta.`,
       };
     }
-    return reply.code(400).send({ error: 'Confira os códigos informados.' });
+    return reply.code(400).send({ error: 'Confira os codigos informados.' });
   });
 
   app.post('/integrations/payments/:provider/test', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const parsed = paymentProviderSchema.safeParse((request.params as { provider?: string }).provider);
     if (!parsed.success || !ownCredentialProviders.includes(parsed.data as OwnCredentialProvider)) {
-      return reply.code(404).send({ error: 'Integração não encontrada.' });
+      return reply.code(404).send({ error: 'Integracao nao encontrada.' });
     }
     const provider = parsed.data as OwnCredentialProvider;
     const [connection] = await db
@@ -305,14 +317,14 @@ export const integrationRoutes = async (app: FastifyInstance) => {
         .set({ status: 'error', lastError: 'Verifique sua credencial.', updatedAt: new Date() })
         .where(eq(paymentConnections.id, connection.id));
       request.log.warn({ err: error, provider, restaurantId: request.auth!.restaurantId }, 'payment credential test failed');
-      return reply.code(422).send({ error: 'Não foi possível confirmar os códigos. Revise os dados e tente novamente.' });
+      return reply.code(422).send({ error: 'Nao foi possivel confirmar os codigos. Revise os dados e tente novamente.' });
     }
   });
 
   app.post('/integrations/payments/:provider/test-receipt', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const parsed = paymentProviderSchema.safeParse((request.params as { provider?: string }).provider);
     if (!parsed.success || !ownCredentialProviders.includes(parsed.data as OwnCredentialProvider)) {
-      return reply.code(404).send({ error: 'Integração não encontrada.' });
+      return reply.code(404).send({ error: 'Integracao nao encontrada.' });
     }
     const provider = parsed.data as OwnCredentialProvider;
     const [connection] = await db
@@ -331,7 +343,7 @@ export const integrationRoutes = async (app: FastifyInstance) => {
       return { data: await runPaymentReceiptTest(provider, connection) };
     } catch (error) {
       request.log.warn({ err: error, provider, restaurantId: request.auth!.restaurantId }, 'payment receipt test failed');
-      return reply.code(422).send({ error: 'O teste de recebimento falhou. Revise os códigos da conexão.' });
+      return reply.code(422).send({ error: 'O teste de recebimento falhou. Revise os codigos da conexao.' });
     }
   });
 
@@ -339,10 +351,10 @@ export const integrationRoutes = async (app: FastifyInstance) => {
     const provider = paymentProviderSchema.safeParse((request.params as { provider?: string }).provider);
     const query = callbackSchema.safeParse(request.query);
     if (!provider.success || !['mercado_pago', 'pagbank'].includes(provider.data) || !query.success) {
-      return reply.code(400).send({ error: 'Não foi possível concluir a conexão.' });
+      return reply.code(400).send({ error: 'Nao foi possivel concluir a conexao.' });
     }
     const state = verifyIntegrationState(query.data.state);
-    if (!state || state.provider !== provider.data) return reply.code(403).send({ error: 'Conexão inválida ou expirada.' });
+    if (!state || state.provider !== provider.data) return reply.code(403).send({ error: 'Conexao invalida ou expirada.' });
     try {
       const tokens =
         provider.data === 'mercado_pago' ? await exchangeMercadoPagoCode(query.data.code) : await exchangePagBankCode(query.data.code);
@@ -380,7 +392,7 @@ export const integrationRoutes = async (app: FastifyInstance) => {
 
   app.post('/integrations/payments/:provider/disconnect', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const provider = paymentProviderSchema.safeParse((request.params as { provider?: string }).provider);
-    if (!provider.success) return reply.code(404).send({ error: 'Integração não encontrada.' });
+    if (!provider.success) return reply.code(404).send({ error: 'Integracao nao encontrada.' });
     await db
       .update(paymentConnections)
       .set({ status: 'disconnected', accessToken: null, refreshToken: null, externalAccountId: null, updatedAt: new Date() })
@@ -391,9 +403,8 @@ export const integrationRoutes = async (app: FastifyInstance) => {
 
   app.post('/integrations/pdv/:provider/connect', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const provider = pdvProviderSchema.safeParse((request.params as { provider?: string }).provider);
-    const body = pdvConnectSchema.safeParse(request.body);
-    if (!provider.success || !body.success) return reply.code(400).send({ error: 'Revise os dados da integração.' });
-    if (!env.INTEGRATION_ENCRYPTION_KEY) return reply.code(503).send({ error: 'Integrações ainda não foram configuradas.' });
+    if (!provider.success) return reply.code(400).send({ error: 'Revise os dados da integracao.' });
+    if (!env.INTEGRATION_ENCRYPTION_KEY) return reply.code(503).send({ error: 'Integracoes ainda nao foram configuradas.' });
     const existing = await db
       .select({ id: pdvConnections.id })
       .from(pdvConnections)
@@ -402,6 +413,56 @@ export const integrationRoutes = async (app: FastifyInstance) => {
     const connectionId = existing[0]?.id ?? crypto.randomUUID();
     const origin = `${request.protocol}://${request.headers.host}`;
     const webhookUrl = `${origin}/webhooks/pdv/${provider.data}/${connectionId}`;
+
+    if (provider.data === 'goomer') {
+      const body = goomerConnectSchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: 'Informe a identificacao e o codigo secreto da Goomer.' });
+      let encryptedCredentials: string;
+      try {
+        const credentials = await createGoomerCredentials(body.data.client_id, body.data.client_secret);
+        encryptedCredentials = encryptIntegrationSecret(serializeGoomerCredentials(credentials));
+      } catch {
+        request.log.warn({ provider: 'goomer', restaurantId: request.auth!.restaurantId }, 'goomer credential validation failed');
+        return reply.code(422).send({ error: 'Nao foi possivel confirmar os dados da Goomer. Revise os codigos e tente novamente.' });
+      }
+      await db
+        .insert(pdvConnections)
+        .values({
+          id: connectionId,
+          restaurantId: request.auth!.restaurantId,
+          provider: provider.data,
+          status: 'connected',
+          integrationToken: encryptedCredentials,
+          webhookUrl,
+          connectedAt: new Date(),
+          lastError: null,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [pdvConnections.restaurantId, pdvConnections.provider],
+          set: {
+            status: 'connected',
+            integrationToken: encryptedCredentials,
+            webhookUrl,
+            connectedAt: new Date(),
+            lastError: null,
+            updatedAt: new Date(),
+          },
+        });
+      await writeAuditLog({
+        request,
+        restaurantId: request.auth!.restaurantId,
+        userId: request.auth!.userId,
+        action: 'pdv_connected',
+        resourceType: 'integration',
+        resourceId: connectionId,
+        newData: { provider: provider.data },
+      });
+      return { data: { provider: provider.data, status: 'connected', webhook_url: webhookUrl } };
+    }
+
+    const body = pdvConnectSchema.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'Revise os dados da integracao.' });
     await db
       .insert(pdvConnections)
       .values({
@@ -423,9 +484,54 @@ export const integrationRoutes = async (app: FastifyInstance) => {
     return { data: { provider: provider.data, status: 'connected', webhook_url: webhookUrl } };
   });
 
+  app.post('/integrations/pdv/:provider/test', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
+    const provider = pdvProviderSchema.safeParse((request.params as { provider?: string }).provider);
+    if (!provider.success || provider.data !== 'goomer') return reply.code(404).send({ error: 'Integracao nao encontrada.' });
+    if (!env.INTEGRATION_ENCRYPTION_KEY) return reply.code(503).send({ error: 'Integracoes ainda nao foram configuradas.' });
+
+    const [connection] = await db
+      .select()
+      .from(pdvConnections)
+      .where(and(eq(pdvConnections.restaurantId, request.auth!.restaurantId), eq(pdvConnections.provider, provider.data)))
+      .limit(1);
+
+    if (!connection?.integrationToken) return reply.code(409).send({ error: 'Conecte a Goomer antes de testar.' });
+
+    try {
+      const credentials = parseGoomerCredentials(decryptIntegrationSecret(connection.integrationToken));
+      const validatedCredentials = await validateGoomerCredentials(credentials);
+      await db
+        .update(pdvConnections)
+        .set({
+          status: 'connected',
+          integrationToken: encryptIntegrationSecret(serializeGoomerCredentials(validatedCredentials)),
+          lastError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(pdvConnections.id, connection.id));
+      await writeAuditLog({
+        request,
+        restaurantId: request.auth!.restaurantId,
+        userId: request.auth!.userId,
+        action: 'pdv_connection_tested',
+        resourceType: 'integration',
+        resourceId: connection.id,
+        newData: { provider: provider.data },
+      });
+      return { data: { provider: provider.data, status: 'connected' } };
+    } catch {
+      await db
+        .update(pdvConnections)
+        .set({ status: 'error', lastError: 'Verifique os codigos da Goomer.', updatedAt: new Date() })
+        .where(eq(pdvConnections.id, connection.id));
+      request.log.warn({ provider: provider.data, restaurantId: request.auth!.restaurantId }, 'goomer connection test failed');
+      return reply.code(422).send({ error: 'Nao foi possivel confirmar a Goomer. Revise os codigos e tente novamente.' });
+    }
+  });
+
   app.post('/integrations/pdv/:provider/disconnect', { preHandler: [app.authenticate, requireRoles('owner')] }, async (request, reply) => {
     const provider = pdvProviderSchema.safeParse((request.params as { provider?: string }).provider);
-    if (!provider.success) return reply.code(404).send({ error: 'Integração não encontrada.' });
+    if (!provider.success) return reply.code(404).send({ error: 'Integracao nao encontrada.' });
     await db
       .update(pdvConnections)
       .set({ status: 'disconnected', integrationToken: null, lastError: null, updatedAt: new Date() })

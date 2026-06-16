@@ -174,6 +174,7 @@ export const IntegrationsPanel = ({ canManage, disabled }: { canManage: boolean;
   const [payments, setPayments] = useState<PaymentIntegrationStatus[]>(paymentCatalog);
   const [pdvs, setPdvs] = useState<PdvIntegrationStatus[]>(pdvCatalog);
   const [tokens, setTokens] = useState<Record<string, string>>({});
+  const [goomerCredentials, setGoomerCredentials] = useState<Record<string, string>>({});
   const [paymentInputs, setPaymentInputs] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<PaymentIntegrationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -205,6 +206,9 @@ export const IntegrationsPanel = ({ canManage, disabled }: { canManage: boolean;
 
   const primaryPayments = payments.filter((payment) => isOwnCredentialProvider(payment.provider) || payment.provider === 'infinitepay');
   const futurePayments = payments.filter((payment) => !primaryPayments.includes(payment));
+  const goomerReady =
+    (goomerCredentials.client_id?.trim().length ?? 0) >= 2 &&
+    (goomerCredentials.client_secret?.trim().length ?? 0) >= 8;
 
   return (
     <div className="space-y-7">
@@ -358,14 +362,65 @@ export const IntegrationsPanel = ({ canManage, disabled }: { canManage: boolean;
 
               {canManage && !disabled ? (
                 pdv.status === 'connected' ? (
-                  <Button
-                    className="w-full"
-                    variant="danger"
-                    disabled={Boolean(busy)}
-                    onClick={() => run(pdv.provider, async () => { await api.disconnectPdv(pdv.provider); setMessage(`${pdv.name} desconectado.`); })}
-                  >
-                    Desconectar
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {pdv.provider === 'goomer' ? (
+                      <Button
+                        className="flex-1"
+                        variant="secondary"
+                        disabled={Boolean(busy)}
+                        icon={busy === `${pdv.provider}-test` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
+                        onClick={() => run(`${pdv.provider}-test`, async () => {
+                          await api.testPdv(pdv.provider);
+                          setMessage('Goomer confirmada com sucesso.');
+                        })}
+                      >
+                        Testar conexao
+                      </Button>
+                    ) : null}
+                    <Button
+                      className="flex-1"
+                      variant="danger"
+                      disabled={Boolean(busy)}
+                      onClick={() => run(pdv.provider, async () => { await api.disconnectPdv(pdv.provider); setMessage(`${pdv.name} desconectado.`); })}
+                    >
+                      Desconectar
+                    </Button>
+                  </div>
+                ) : pdv.provider === 'goomer' ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-sky-300/20 bg-sky-400/10 px-3 py-2 text-xs leading-5 text-sky-100">
+                        Encontre esses dados na Goomer: Configuracoes &gt; Apps e Integracoes &gt; Adicionar integracao &gt; Open Delivery &gt; Gerar chave.
+                    </div>
+                    <input
+                      className="form-field"
+                      autoComplete="off"
+                      placeholder="Client Id da Goomer"
+                      value={goomerCredentials.client_id ?? ''}
+                      onChange={(event) => setGoomerCredentials((current) => ({ ...current, client_id: event.target.value }))}
+                    />
+                    <input
+                      className="form-field"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Client Secret da Goomer"
+                      value={goomerCredentials.client_secret ?? ''}
+                      onChange={(event) => setGoomerCredentials((current) => ({ ...current, client_secret: event.target.value }))}
+                    />
+                    <Button
+                      className="w-full"
+                      disabled={Boolean(busy) || !goomerReady}
+                      onClick={() => run(pdv.provider, async () => {
+                        await api.connectPdv(pdv.provider, {
+                          client_id: goomerCredentials.client_id,
+                          client_secret: goomerCredentials.client_secret,
+                        });
+                        setGoomerCredentials({});
+                        setMessage(`${pdv.name} conectado. Copie o link e cadastre na Goomer.`);
+                      })}
+                    >
+                      Conectar Goomer
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <input

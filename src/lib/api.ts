@@ -378,11 +378,14 @@ export const api = {
   async disconnectPayment(provider: string) {
     return apiFetch<{ success: true }>(`/integrations/payments/${provider}/disconnect`, { method: 'POST' });
   },
-  async connectPdv(provider: string, token: string) {
+  async connectPdv(provider: string, input: string | Record<string, string>) {
     return apiFetch<{ data: PdvIntegrationStatus }>(`/integrations/pdv/${provider}/connect`, {
       method: 'POST',
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(typeof input === 'string' ? { token: input } : input),
     });
+  },
+  async testPdv(provider: string) {
+    return apiFetch<{ data: { provider: string; status: string } }>(`/integrations/pdv/${provider}/test`, { method: 'POST' });
   },
   async disconnectPdv(provider: string) {
     return apiFetch<{ success: true }>(`/integrations/pdv/${provider}/disconnect`, { method: 'POST' });
