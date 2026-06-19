@@ -24,7 +24,7 @@ export const signRefreshToken = async (sessionId: string, userId: string) =>
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime('30d')
     .sign(refreshSecret);
 
 export const verifyAccessToken = async (token: string) => {

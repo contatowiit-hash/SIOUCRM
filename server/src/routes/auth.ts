@@ -11,25 +11,36 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/
 import { writeAuditLog } from '../utils/audit.js';
 
 const refreshCookieName = 'syntra_refresh';
-const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+const refreshSessionTtlDays = 30;
+const refreshSessionTtlMs = refreshSessionTtlDays * 24 * 60 * 60 * 1000;
+const refreshSessionTtlSeconds = Math.floor(refreshSessionTtlMs / 1000);
 
-const cookieOptions = {
+const firstHeaderValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.split(',')[0]?.trim();
+
+const isHttpsRequest = (request: FastifyRequest) => {
+  const protocol = firstHeaderValue(request.headers['x-forwarded-proto']) ?? request.protocol;
+  return protocol === 'https';
+};
+
+const refreshCookieOptions = (request: FastifyRequest) => ({
   path: '/',
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: env.NODE_ENV === 'production' || env.APP_URL.startsWith('https://'),
+  secure: env.NODE_ENV === 'production' || isHttpsRequest(request),
   priority: 'high' as const,
-  maxAge: Math.floor(sevenDaysMs / 1000),
-};
+  maxAge: refreshSessionTtlSeconds,
+});
 
-const clearRefreshCookie = (reply: FastifyReply) =>
-  reply.clearCookie(refreshCookieName, {
-    path: cookieOptions.path,
-    httpOnly: cookieOptions.httpOnly,
-    sameSite: cookieOptions.sameSite,
-    secure: cookieOptions.secure,
-    priority: cookieOptions.priority,
+const clearRefreshCookie = (request: FastifyRequest, reply: FastifyReply) => {
+  const options = refreshCookieOptions(request);
+  return reply.clearCookie(refreshCookieName, {
+    path: options.path,
+    httpOnly: options.httpOnly,
+    sameSite: options.sameSite,
+    secure: options.secure,
+    priority: options.priority,
   });
+};
 
 const trustedBrowserOrigins = new Set([new URL(env.APP_URL).origin]);
 trustedBrowserOrigins.add('https://www.sioucrm.com');
@@ -38,8 +49,6 @@ if (env.NODE_ENV !== 'production') {
   trustedBrowserOrigins.add('http://127.0.0.1:5174');
   trustedBrowserOrigins.add('http://localhost:5174');
 }
-
-const firstHeaderValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.split(',')[0]?.trim();
 
 const requestOrigin = (request: FastifyRequest) => {
   const host = firstHeaderValue(request.headers['x-forwarded-host']) ?? firstHeaderValue(request.headers.host);
@@ -81,7 +90,7 @@ const issueTokens = async ({
     email: user.email,
   });
   const rawRefresh = randomToken();
-  const expiresAt = new Date(Date.now() + sevenDaysMs);
+  const expiresAt = new Date(Date.now() + refreshSessionTtlMs);
   const [session] = await db
     .insert(refreshSessions)
     .values({
@@ -208,7 +217,7 @@ export const authRoutes = async (app: FastifyInstance) => {
 
     const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.id, user.restaurantId)).limit(1);
     const tokens = await issueTokens({ user, request });
-    reply.setCookie(refreshCookieName, tokens.refreshToken, cookieOptions);
+    reply.setCookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions(request));
 
     await writeAuditLog({
       request,
@@ -283,7 +292,7 @@ export const authRoutes = async (app: FastifyInstance) => {
         }).catch((error) => request.log.error({ error }, 'refresh reuse audit failed'));
       }
 
-      clearRefreshCookie(reply);
+      clearRefreshCookie(request, reply);
       return reply.code(401).send({ error: 'Unauthorized' });
     }
 
@@ -297,7 +306,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.id, user.restaurantId)).limit(1);
     await db.update(refreshSessions).set({ revokedAt: new Date() }).where(eq(refreshSessions.id, session.id));
     const tokens = await issueTokens({ user, request });
-    reply.setCookie(refreshCookieName, tokens.refreshToken, cookieOptions);
+    reply.setCookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions(request));
 
     return reply.send({
       access_token: tokens.accessToken,
@@ -327,7 +336,7 @@ export const authRoutes = async (app: FastifyInstance) => {
         }
       }
     }
-    clearRefreshCookie(reply);
+    clearRefreshCookie(request, reply);
     return reply.send({ success: true });
   });
 };
