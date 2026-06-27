@@ -1,14 +1,16 @@
 ﻿import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { refreshSessions, restaurants, users } from '../db/schema.js';
+import { emailVerificationTokens, refreshSessions, restaurants, users } from '../db/schema.js';
 import { env } from '../env.js';
-import { LoginSchema, RegisterSchema } from '../schemas.js';
+import { LoginSchema, RegisterSchema, ResendVerificationSchema } from '../schemas.js';
 import { toRestaurantDto, toUserDto } from '../utils/format.js';
 import { isDeveloperEmail, isDeveloperPassword } from '../utils/developer.js';
 import { getIp, hashPassword, randomToken, sanitizeText, sha256, slugify, verifyPassword } from '../utils/security.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/tokens.js';
 import { writeAuditLog } from '../utils/audit.js';
+import { isMailerConfigured, sendVerificationEmail } from '../lib/mailer.js';
+import { generateVerificationToken, hasRecentVerificationToken } from '../services/emailVerification.js';
 
 const refreshCookieName = 'syntra_refresh';
 const refreshSessionTtlDays = 30;
@@ -76,6 +78,22 @@ const requireTrustedBrowserOrigin: preHandlerHookHandler = async (request: Fasti
   }
 };
 
+const verificationRedirectUrl = (status: 'verified' | 'invalid' | 'expired') => {
+  const url = new URL('/login', env.FRONTEND_URL);
+  if (status === 'verified') url.searchParams.set('verified', 'true');
+  if (status === 'invalid') url.searchParams.set('verification', 'invalid');
+  if (status === 'expired') url.searchParams.set('verification', 'expired');
+  return url.toString();
+};
+
+const sendUserVerificationEmail = async (user: typeof users.$inferSelect) => {
+  const token = await generateVerificationToken(user.id);
+  await sendVerificationEmail(user.email, token);
+};
+
+const resendVerificationAcceptedMessage =
+  'Se existir uma conta aguardando confirmacao, enviaremos um novo email em instantes.';
+
 const issueTokens = async ({
   user,
   request,
@@ -118,6 +136,12 @@ export const authRoutes = async (app: FastifyInstance) => {
       return reply.code(409).send({ error: 'NÃ£o foi possÃ­vel criar a conta agora.' });
     }
 
+    const requiresEmailVerification = env.NODE_ENV === 'production';
+    if (requiresEmailVerification && !isMailerConfigured()) {
+      request.log.error({ emailConfigured: false }, 'email verification is required but SMTP is not configured');
+      return reply.code(503).send({ error: 'Cadastro indisponivel no momento. Tente novamente em alguns minutos.' });
+    }
+
     const restaurantSlug = `${slugify(input.restaurantName) || 'restaurante'}-${crypto.randomUUID().slice(0, 8)}`;
     const passwordHash = await hashPassword(input.password);
 
@@ -157,12 +181,95 @@ export const authRoutes = async (app: FastifyInstance) => {
       newData: { email, restaurant: result.restaurant.name },
     });
 
+    if (requiresEmailVerification) {
+      sendUserVerificationEmail(result.user).catch((error) =>
+        request.log.error(
+          { err: error, userId: result.user.id, restaurantId: result.restaurant.id },
+          'email verification delivery failed',
+        ),
+      );
+    }
+
     return reply.code(201).send({
       user: toUserDto(result.user),
       restaurant: toRestaurantDto(result.restaurant, { developer: isDeveloperEmail(result.user.email) }),
-      requires_email_verification: env.NODE_ENV === 'production',
+      requires_email_verification: requiresEmailVerification,
     });
   });
+
+  app.get('/auth/verify-email', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const query = request.query as { token?: unknown };
+    const token = typeof query.token === 'string' ? query.token.trim() : '';
+    if (!token || token.length > 200) return reply.redirect(verificationRedirectUrl('invalid'));
+
+    const [verification] = await db
+      .select()
+      .from(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.tokenHash, sha256(token)))
+      .limit(1);
+
+    if (!verification) return reply.redirect(verificationRedirectUrl('invalid'));
+
+    if (verification.expiresAt < new Date()) {
+      await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+      return reply.redirect(verificationRedirectUrl('expired'));
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, verification.userId)).limit(1);
+    if (!user || user.isDeleted) {
+      await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+      return reply.redirect(verificationRedirectUrl('invalid'));
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ emailVerifiedAt: user.emailVerifiedAt ?? new Date(), updatedAt: new Date() })
+        .where(eq(users.id, user.id));
+      await tx.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+    });
+
+    await writeAuditLog({
+      request,
+      restaurantId: user.restaurantId,
+      userId: user.id,
+      action: 'auth_email_verified',
+      resourceType: 'user',
+      resourceId: user.id,
+    });
+
+    return reply.redirect(verificationRedirectUrl('verified'));
+  });
+
+  app.post(
+    '/auth/resend-verification',
+    { preHandler: requireTrustedBrowserOrigin, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = ResendVerificationSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'Dados invalidos' });
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, parsed.data.email), eq(users.isDeleted, false)))
+        .limit(1);
+
+      if (!user || user.emailVerifiedAt) return reply.send({ message: resendVerificationAcceptedMessage });
+      if (await hasRecentVerificationToken(user.id)) {
+        return reply.code(429).send({ error: 'Aguarde antes de solicitar novo email' });
+      }
+      if (!isMailerConfigured()) return reply.code(503).send({ error: 'Envio de email indisponivel no momento' });
+
+      try {
+        await sendUserVerificationEmail(user);
+      } catch (error) {
+        request.log.error({ err: error, userId: user.id, restaurantId: user.restaurantId }, 'email verification resend failed');
+        return reply.code(503).send({ error: 'Nao foi possivel enviar o email agora' });
+      }
+
+      return reply.send({ message: resendVerificationAcceptedMessage });
+    },
+  );
 
   app.post('/auth/login', { preHandler: requireTrustedBrowserOrigin, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsed = LoginSchema.safeParse(request.body);

@@ -145,7 +145,18 @@ export const LoginPage = () => {
   const [searchParams] = useSearchParams();
   const { startApiSession } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(() => {
+    if (searchParams.get('verified') === 'true') {
+      return { type: 'success', text: 'Email confirmado. Agora voce pode entrar no painel.' };
+    }
+    if (searchParams.get('verification') === 'expired') {
+      return { type: 'error', text: 'Link expirado. Solicite um novo email de confirmacao.' };
+    }
+    if (searchParams.get('verification') === 'invalid') {
+      return { type: 'error', text: 'Link invalido. Solicite um novo email de confirmacao.' };
+    }
+    return null;
+  });
   const {
     register,
     handleSubmit,
@@ -380,7 +391,7 @@ export const ResetPasswordPage = () => {
   );
 };
 
-export const VerifyEmailPage = () => (
+export const LegacyVerifyEmailPage = () => (
   <AuthShell
     title="Verifique seu email"
     subtitle="Para proteger o restaurante, o painel só é liberado após confirmação de email."
@@ -394,3 +405,66 @@ export const VerifyEmailPage = () => (
     </Link>
   </AuthShell>
 );
+
+export const VerifyEmailPage = () => {
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetPasswordInput>({ resolver: zodResolver(ResetPasswordSchema) });
+
+  const onSubmit = async (values: ResetPasswordInput) => {
+    setMessage(null);
+    try {
+      const result = await api.resendVerification({ email: values.email });
+      setMessage({ type: 'success', text: result.message });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Nao foi possivel reenviar agora.',
+      });
+    }
+  };
+
+  return (
+    <AuthShell
+      title="Verifique seu email"
+      subtitle="Para proteger o restaurante, o painel so e liberado depois da confirmacao."
+      active="verify"
+    >
+      <div className="rounded-2xl border border-neon/25 bg-neon/10 p-5 text-sm leading-7 text-sky-100">
+        Abra o link enviado para sua caixa de entrada. Depois disso, entre novamente no SIOU.
+      </div>
+
+      <form className="mt-5 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+        <label className="block">
+          <span className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <Mail className="h-4 w-4 text-neon" />
+            Email
+          </span>
+          <input className="form-field" type="email" autoComplete="email" {...register('email')} />
+          <FieldError message={errors.email?.message} />
+        </label>
+        {message ? (
+          <div
+            className={`rounded-2xl border p-3 text-sm ${
+              message.type === 'error'
+                ? 'border-rose-400/30 bg-rose-500/10 text-rose-100'
+                : 'border-neon/30 bg-neon/10 text-sky-100'
+            }`}
+          >
+            {message.text}
+          </div>
+        ) : null}
+        <Button className="w-full" type="submit" disabled={isSubmitting}>
+          Reenviar email
+        </Button>
+      </form>
+
+      <Link to="/login" className="mt-5 inline-flex text-sm font-bold text-neon hover:text-sky-200">
+        Voltar para login
+      </Link>
+    </AuthShell>
+  );
+};

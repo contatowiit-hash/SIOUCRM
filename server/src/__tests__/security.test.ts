@@ -206,6 +206,7 @@ test('redaction remove credenciais de mensagens e stack traces', () => {
     'REFRESH_TOKEN_SECRET=refresh-fake-secret-value',
     'WHATSAPP_ACCESS_TOKEN=whatsapp-fake-token-value',
     'DATABASE_URL=postgresql://user:password@localhost:5432/syntra',
+    'ZOHO_SMTP_PASS=zoho-fake-password',
   ];
 
   for (const sample of samples) {
@@ -277,6 +278,36 @@ test('cookie de renovacao usa politica segura e consistente', async () => {
   assert.match(api, /credentials:\s*'include'/);
   assert.doesNotMatch(api, /localStorage\.setItem\([^)]*access_token/s);
   assert.match(api, /async refresh\(\)\s*\{\s*return refreshAccessToken\(\);\s*\}/s);
+});
+
+test('verificacao de email usa SMTP no backend e token com hash', async () => {
+  const auth = await read('server/src/routes/auth.ts');
+  const schema = await read('server/src/db/schema.ts');
+  const envSource = await read('server/src/env.ts');
+  const mailer = await read('server/src/lib/mailer.ts');
+  const service = await read('server/src/services/emailVerification.ts');
+  const api = await read('src/lib/api.ts');
+  const authPages = await read('src/pages/AuthPages.tsx');
+  const authProvider = await read('src/providers/AuthProvider.tsx');
+
+  assert.match(schema, /emailVerificationTokens/);
+  assert.match(schema, /tokenHash: text\('token_hash'\)/);
+  assert.doesNotMatch(schema, /token:\s*text\('token'\)/);
+  assert.match(envSource, /ZOHO_SMTP_USER/);
+  assert.match(envSource, /ZOHO_SMTP_PASS/);
+  assert.match(envSource, /VITE_ZOHO_SMTP_PASS/);
+  assert.match(mailer, /smtp\.zoho\.com/);
+  assert.match(mailer, /sendVerificationEmail/);
+  assert.match(service, /randomBytes\(32\)\.toString\('hex'\)/);
+  assert.match(service, /sha256\(token\)/);
+  assert.match(auth, /\/auth\/verify-email/);
+  assert.match(auth, /\/auth\/resend-verification/);
+  assert.match(auth, /generateVerificationToken/);
+  assert.match(auth, /sendUserVerificationEmail\(result\.user\)\.catch/);
+  assert.match(api, /resendVerification/);
+  assert.match(authPages, /Reenviar email/);
+  assert.match(authProvider, /email_confirmed_at:\s*user\.email_verified_at/);
+  assert.doesNotMatch(authProvider, /email_verified_at\s*\|\|\s*new Date/);
 });
 
 test('RBAC protege cobranca, IA, automacoes e configuracao do WhatsApp', async () => {

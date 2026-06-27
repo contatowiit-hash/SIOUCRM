@@ -12,11 +12,15 @@ NODE_ENV=development
 API_HOST=127.0.0.1
 API_PORT=3333
 APP_URL=http://127.0.0.1:5173
+FRONTEND_URL=https://www.sioucrm.com
+BACKEND_URL=https://sua-api-na-render.onrender.com
 DATABASE_URL=postgresql://...pooler.../neondb?sslmode=require&channel_binding=require
 DIRECT_DATABASE_URL=postgresql://.../neondb?sslmode=require&channel_binding=require
 JWT_SECRET=uma-chave-grande-com-mais-de-32-caracteres
 REFRESH_TOKEN_SECRET=outra-chave-grande-com-mais-de-32-caracteres
 WEBHOOK_SECRET=um-segredo-grande-para-validar-webhooks
+ZOHO_SMTP_USER=siou@sioucrm.com
+ZOHO_SMTP_PASS=sua-senha-de-app-do-zoho
 ```
 
 Use a URL pooled da Neon em `DATABASE_URL` e a URL direct em `DIRECT_DATABASE_URL`.

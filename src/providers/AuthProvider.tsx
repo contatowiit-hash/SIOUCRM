@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user: {
         id: user.id,
         email: user.email,
-        email_confirmed_at: user.email_verified_at || new Date().toISOString(),
+        email_confirmed_at: user.email_verified_at,
       },
     });
     setProfile({

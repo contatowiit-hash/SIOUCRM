@@ -1,5 +1,5 @@
 const SENSITIVE_KEY_PATTERN =
-  /(authorization|cookie|password|secret|token|api[_-]?key|signature|rawbody|checkouturl|checkout_url|sessionid|session_id|database[_-]?url|connection[_-]?string|creds|auth|qr)/i;
+  /(authorization|cookie|password|pass|secret|token|api[_-]?key|signature|rawbody|checkouturl|checkout_url|sessionid|session_id|database[_-]?url|connection[_-]?string|creds|auth|qr)/i;
 
 const SENSITIVE_VALUE = '[REDACTED]';
 
@@ -8,9 +8,9 @@ const SENSITIVE_TEXT_PATTERNS = [
   /\b(?:gsk|whsec|sk_(?:live|test)|rk_(?:live|test)|gh[pousr]|github_pat)_[A-Za-z0-9_-]+\b/gi,
   /postgres(?:ql)?:\/\/[^\s"'`]+/gi,
   /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
-  /\b(?:access_token|refresh_token|password|secret|api[_-]?key|token)\s*[:=]\s*[^\s,;]+/gi,
+  /\b(?:access_token|refresh_token|password|pass|secret|api[_-]?key|token)\s*[:=]\s*[^\s,;]+/gi,
   /\b[A-Z0-9_]*(?:CLIENT_SECRET|WEBHOOK_SECRET)\b\s*[:=]\s*[^\s,;]+/gi,
-  /\b(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|WEBHOOK_SECRET|GATEWAY_SECRET|JWT_SECRET|REFRESH_TOKEN_SECRET|GROQ_API_KEY|WHATSAPP_ACCESS_TOKEN|DATABASE_URL|DIRECT_DATABASE_URL|META_APP_SECRET|EVOLUTION_API_KEY|DEV_ACCOUNT_PASSWORD|INTEGRATION_ENCRYPTION_KEY|MERCADO_PAGO_CLIENT_SECRET|MERCADO_PAGO_WEBHOOK_SECRET)\b\s*[:=]\s*[^\s,;]+/gi,
+  /\b(?:STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|WEBHOOK_SECRET|GATEWAY_SECRET|JWT_SECRET|REFRESH_TOKEN_SECRET|GROQ_API_KEY|WHATSAPP_ACCESS_TOKEN|DATABASE_URL|DIRECT_DATABASE_URL|META_APP_SECRET|EVOLUTION_API_KEY|DEV_ACCOUNT_PASSWORD|INTEGRATION_ENCRYPTION_KEY|MERCADO_PAGO_CLIENT_SECRET|MERCADO_PAGO_WEBHOOK_SECRET|ZOHO_SMTP_PASS)\b\s*[:=]\s*[^\s,;]+/gi,
 ];
 
 export const redactSensitiveText = (value: string) =>

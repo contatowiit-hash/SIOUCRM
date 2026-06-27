@@ -122,6 +122,23 @@ export const refreshSessions = pgTable(
   }),
 );
 
+export const emailVerificationTokens = pgTable(
+  'email_verification_tokens',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('email_verification_tokens_user_id_idx').on(table.userId),
+    tokenHashIdx: uniqueIndex('email_verification_tokens_token_hash_idx').on(table.tokenHash),
+  }),
+);
+
 export const customers = pgTable(
   'customers',
   {

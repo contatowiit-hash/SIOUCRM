@@ -14,6 +14,8 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   DIRECT_DATABASE_URL: z.string().url().optional(),
   APP_URL: appUrl.default('http://127.0.0.1:5174'),
+  FRONTEND_URL: z.preprocess((value) => (value === '' ? undefined : value), appUrl.optional()),
+  BACKEND_URL: z.preprocess((value) => (value === '' ? undefined : value), appUrl.optional()),
   JWT_SECRET: z.string().min(32),
   REFRESH_TOKEN_SECRET: z.string().min(32),
   WEBHOOK_SECRET: optionalSecret,
@@ -64,6 +66,8 @@ const EnvSchema = z.object({
   INFINITEPAY_WEBHOOK_SECRET: optionalSecret,
   GOOMER_PARTNER_KEY: optionalSecret,
   GOOMER_PARTNER_TOKEN: optionalSecret,
+  ZOHO_SMTP_USER: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
+  ZOHO_SMTP_PASS: optionalSecret,
   DEV_ACCOUNT_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   DEV_ACCOUNT_PASSWORD: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(10).optional()),
 });
@@ -103,6 +107,8 @@ const forbiddenFrontendSecretKeys = [
   'VITE_INFINITEPAY_WEBHOOK_SECRET',
   'VITE_GOOMER_PARTNER_KEY',
   'VITE_GOOMER_PARTNER_TOKEN',
+  'VITE_ZOHO_SMTP_USER',
+  'VITE_ZOHO_SMTP_PASS',
 ] as const;
 
 const exposedFrontendSecrets = forbiddenFrontendSecretKeys.filter((key) => Boolean(process.env[key]?.trim()));
@@ -114,6 +120,8 @@ const parsedEnv = EnvSchema.parse(process.env);
 
 export const env = {
   ...parsedEnv,
+  FRONTEND_URL: parsedEnv.FRONTEND_URL ?? parsedEnv.APP_URL,
+  BACKEND_URL: parsedEnv.BACKEND_URL ?? parsedEnv.APP_URL,
   API_HOST: parsedEnv.API_HOST ?? (parsedEnv.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'),
   API_PORT: parsedEnv.PORT ?? parsedEnv.API_PORT ?? 3333,
 };
