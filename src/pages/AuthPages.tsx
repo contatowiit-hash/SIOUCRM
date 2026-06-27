@@ -272,7 +272,9 @@ export const RegisterPage = () => {
       const result = await api.register(values);
       setMessage({
         type: 'success',
-        text: result.requires_email_verification
+        text: result.message
+          ? result.message
+          : result.requires_email_verification
           ? 'Conta criada. Verifique seu email antes de acessar o painel.'
           : 'Conta criada. Agora entre para escolher seu plano.',
       });

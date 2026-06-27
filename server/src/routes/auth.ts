@@ -93,6 +93,10 @@ const sendUserVerificationEmail = async (user: typeof users.$inferSelect) => {
 
 const resendVerificationAcceptedMessage =
   'Se existir uma conta aguardando confirmacao, enviaremos um novo email em instantes.';
+const registerExistingAccountMessage =
+  'Esse email ja tem uma conta. Entre no painel ou use recuperar senha.';
+const registerVerificationQueuedMessage =
+  'Conta aguardando confirmacao. Enviamos um novo email para liberar seu acesso.';
 
 const issueTokens = async ({
   user,
@@ -131,12 +135,33 @@ export const authRoutes = async (app: FastifyInstance) => {
 
     const input = parsed.data;
     const email = input.email.toLowerCase();
-    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-    if (existing.length) {
-      return reply.code(409).send({ error: 'NÃ£o foi possÃ­vel criar a conta agora.' });
+    const requiresEmailVerification = env.NODE_ENV === 'production';
+    const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (existing && !existing.isDeleted) {
+      if (requiresEmailVerification && !existing.emailVerifiedAt) {
+        if (!isMailerConfigured()) {
+          request.log.error({ emailConfigured: false }, 'email verification resend is required but SMTP is not configured');
+          return reply.code(503).send({ error: 'Cadastro indisponivel no momento. Tente novamente em alguns minutos.' });
+        }
+
+        if (!(await hasRecentVerificationToken(existing.id))) {
+          sendUserVerificationEmail(existing).catch((error) =>
+            request.log.error(
+              { err: error, userId: existing.id, restaurantId: existing.restaurantId },
+              'email verification delivery failed for existing account',
+            ),
+          );
+        }
+
+        return reply.code(202).send({
+          requires_email_verification: true,
+          message: registerVerificationQueuedMessage,
+        });
+      }
+
+      return reply.code(409).send({ error: registerExistingAccountMessage });
     }
 
-    const requiresEmailVerification = env.NODE_ENV === 'production';
     if (requiresEmailVerification && !isMailerConfigured()) {
       request.log.error({ emailConfigured: false }, 'email verification is required but SMTP is not configured');
       return reply.code(503).send({ error: 'Cadastro indisponivel no momento. Tente novamente em alguns minutos.' });

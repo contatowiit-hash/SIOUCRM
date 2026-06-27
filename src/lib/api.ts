@@ -240,10 +240,13 @@ export const api = {
     password: string;
     confirmPassword: string;
   }) {
-    return apiFetch<{ user: ApiUser; restaurant: ApiRestaurant; requires_email_verification: boolean }>('/auth/register', {
+    return apiFetch<{ user?: ApiUser; restaurant?: ApiRestaurant; requires_email_verification: boolean; message?: string }>(
+      '/auth/register',
+      {
       method: 'POST',
       body: JSON.stringify(input),
-    });
+      },
+    );
   },
   async resendVerification(input: { email: string }) {
     return apiFetch<{ message: string }>('/auth/resend-verification', {
