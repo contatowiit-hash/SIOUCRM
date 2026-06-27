@@ -8,6 +8,7 @@ Crie um `.env.local` ou `.env` na raiz do projeto com:
 
 ```env
 VITE_API_URL=http://127.0.0.1:3333/api
+VITE_BACKEND_URL=https://sua-api-na-render.onrender.com
 NODE_ENV=development
 API_HOST=127.0.0.1
 API_PORT=3333
@@ -24,6 +25,17 @@ ZOHO_SMTP_PASS=sua-senha-de-app-do-zoho
 ```
 
 Use a URL pooled da Neon em `DATABASE_URL` e a URL direct em `DIRECT_DATABASE_URL`.
+
+## Produção com Vercel + Render
+
+Na Render ficam os segredos do backend: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`,
+`ZOHO_SMTP_USER` e `ZOHO_SMTP_PASS`.
+
+Na Vercel, configure `BACKEND_URL` apontando para a URL pública da Render. Assim o site continua
+chamando `/api` no próprio domínio e a Vercel encaminha a requisição para o backend real.
+
+Opcionalmente, `VITE_BACKEND_URL` ou `VITE_API_URL` podem apontar o frontend direto para a Render,
+mas o proxy por `BACKEND_URL` é preferível para manter os cookies no domínio do site.
 
 ## Rodar banco
 

@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { buildApp } from '../server/src/app.js';
 
 export const config = {
@@ -8,6 +10,17 @@ export const config = {
 };
 
 let appPromise: ReturnType<typeof buildApp> | null = null;
+const backendUrl = process.env.BACKEND_URL?.trim().replace(/\/+$/, '');
+const hopByHopHeaders = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
 
 export const normalizeVercelApiUrl = (url?: string) => {
   const parsed = new URL(url ?? '/', 'http://vercel.local');
@@ -26,7 +39,75 @@ const getApp = async () => {
   return app;
 };
 
+const shouldProxyToBackend = (req: IncomingMessage) => {
+  if (!backendUrl) return false;
+
+  try {
+    const target = new URL(backendUrl);
+    return target.host !== req.headers.host;
+  } catch {
+    return false;
+  }
+};
+
+const proxyToBackend = async (req: IncomingMessage, res: ServerResponse) =>
+  new Promise<void>((resolve) => {
+    const normalizedUrl = normalizeVercelApiUrl(req.url);
+    const target = new URL(normalizedUrl, `${backendUrl}/`);
+    const headers: Record<string, string | string[]> = {};
+
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (!value || hopByHopHeaders.has(key.toLowerCase())) continue;
+      headers[key] = value;
+    }
+
+    headers.host = target.host;
+    headers['x-forwarded-host'] = req.headers.host || target.host;
+    headers['x-forwarded-proto'] = 'https';
+
+    const transport = target.protocol === 'https:' ? httpsRequest : httpRequest;
+    const proxyReq = transport(
+      target,
+      {
+        method: req.method,
+        headers,
+      },
+      (proxyRes) => {
+        res.statusCode = proxyRes.statusCode ?? 502;
+
+        for (const [key, value] of Object.entries(proxyRes.headers)) {
+          if (!value || hopByHopHeaders.has(key.toLowerCase())) continue;
+          res.setHeader(key, value);
+        }
+
+        proxyRes.pipe(res);
+        proxyRes.on('end', resolve);
+      },
+    );
+
+    proxyReq.on('error', () => {
+      if (!res.headersSent) {
+        res.statusCode = 502;
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: 'Servico temporariamente indisponivel.' }));
+      }
+      resolve();
+    });
+
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      proxyReq.end();
+      return;
+    }
+
+    req.pipe(proxyReq);
+  });
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  if (shouldProxyToBackend(req)) {
+    await proxyToBackend(req, res);
+    return;
+  }
+
   req.url = normalizeVercelApiUrl(req.url);
   const app = await getApp();
   app.server.emit('request', req, res);

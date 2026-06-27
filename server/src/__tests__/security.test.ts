@@ -139,6 +139,17 @@ test('headers de seguranca fortes e cache privado estao configurados', async () 
   assert.match(staticServer, /Content-Security-Policy/);
   assert.match(vercel, /Cross-Origin-Opener-Policy/);
   assert.match(vercel, /Strict-Transport-Security/);
+  assert.match(vercel, /connect-src 'self' https:\/\/\*\.onrender\.com/);
+});
+
+test('frontend pode apontar para backend hospedado na Render', async () => {
+  const api = await read('src/lib/api.ts');
+  const readme = await read('server/README.md');
+
+  assert.match(api, /VITE_BACKEND_URL/);
+  assert.match(api, /configuredBackendUrl\.replace/);
+  assert.match(api, /\/api`/);
+  assert.match(readme, /VITE_BACKEND_URL=https:\/\/sua-api-na-render\.onrender\.com/);
 });
 
 test('deploy da Vercel encaminha webhooks e limita conexoes serverless', async () => {
@@ -152,6 +163,9 @@ test('deploy da Vercel encaminha webhooks e limita conexoes serverless', async (
   assert.match(vercel, /"source": "\/webhooks\/:path\*"/);
   assert.match(vercel, /"destination": "\/api\?__path=\/webhooks\/:path\*"/);
   assert.match(handler, /normalizeVercelApiUrl/);
+  assert.match(handler, /BACKEND_URL/);
+  assert.match(handler, /shouldProxyToBackend/);
+  assert.match(handler, /proxyToBackend/);
   assert.match(handler, /searchParams\.get\('__path'\)/);
   assert.match(handler, /req\.url = normalizeVercelApiUrl\(req\.url\)/);
   assert.match(database, /max:\s*process\.env\.VERCEL \? 1 : 10/);

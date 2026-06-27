@@ -8,9 +8,17 @@ import type {
   WhatsAppSendResult,
 } from '../types/domain';
 
-const defaultApiBaseUrl = import.meta.env.PROD ? '/api' : 'http://127.0.0.1:3334/api';
+const normalizeApiBaseUrl = () => {
+  const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (configuredApiUrl) return configuredApiUrl.replace(/\/+$/, '');
 
-export const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) || defaultApiBaseUrl;
+  const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim();
+  if (configuredBackendUrl) return `${configuredBackendUrl.replace(/\/+$/, '')}/api`;
+
+  return import.meta.env.PROD ? '/api' : 'http://127.0.0.1:3334/api';
+};
+
+export const apiBaseUrl = normalizeApiBaseUrl();
 export const isApiConfigured = Boolean(apiBaseUrl);
 
 let accessToken: string | null = null;
@@ -240,13 +248,15 @@ export const api = {
     password: string;
     confirmPassword: string;
   }) {
-    return apiFetch<{ user?: ApiUser; restaurant?: ApiRestaurant; requires_email_verification: boolean; message?: string }>(
-      '/auth/register',
-      {
+    return apiFetch<{
+      user?: ApiUser;
+      restaurant?: ApiRestaurant;
+      requires_email_verification: boolean;
+      message?: string;
+    }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
-      },
-    );
+    });
   },
   async resendVerification(input: { email: string }) {
     return apiFetch<{ message: string }>('/auth/resend-verification', {
