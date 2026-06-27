@@ -38,6 +38,10 @@ export const ResendVerificationSchema = z.object({
   email: z.string().email().max(255).toLowerCase(),
 });
 
+export const VerifyEmailTokenSchema = z.object({
+  token: z.string().min(20).max(200),
+});
+
 export const CreateCustomerSchema = z.object({
   name: z.string().min(2).max(100).regex(/^[a-zA-ZÀ-ÿ\s'-]+$/),
   phone: PhoneSchema,

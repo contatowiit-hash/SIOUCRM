@@ -264,6 +264,12 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  async verifyEmail(input: { token: string }) {
+    return apiFetch<{ message: string }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
   async refresh() {
     return refreshAccessToken();
   },

@@ -3,7 +3,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { emailVerificationTokens, refreshSessions, restaurants, users } from '../db/schema.js';
 import { env } from '../env.js';
-import { LoginSchema, RegisterSchema, ResendVerificationSchema } from '../schemas.js';
+import { LoginSchema, RegisterSchema, ResendVerificationSchema, VerifyEmailTokenSchema } from '../schemas.js';
 import { toRestaurantDto, toUserDto } from '../utils/format.js';
 import { isDeveloperEmail, isDeveloperPassword } from '../utils/developer.js';
 import { getIp, hashPassword, randomToken, sanitizeText, sha256, slugify, verifyPassword } from '../utils/security.js';
@@ -97,6 +97,7 @@ const registerExistingAccountMessage =
   'Esse email ja tem uma conta. Entre no painel ou use recuperar senha.';
 const registerVerificationQueuedMessage =
   'Conta aguardando confirmacao. Enviamos um novo email para liberar seu acesso.';
+type EmailVerificationStatus = 'verified' | 'invalid' | 'expired';
 
 const issueTokens = async ({
   user,
@@ -128,6 +129,49 @@ const issueTokens = async ({
   return { accessToken, refreshToken: `${refreshToken}.${rawRefresh}` };
 };
 
+const verifyEmailToken = async (token: string, request: FastifyRequest): Promise<EmailVerificationStatus> => {
+  const cleanToken = token.trim();
+  if (!cleanToken || cleanToken.length > 200) return 'invalid';
+
+  const [verification] = await db
+    .select()
+    .from(emailVerificationTokens)
+    .where(eq(emailVerificationTokens.tokenHash, sha256(cleanToken)))
+    .limit(1);
+
+  if (!verification) return 'invalid';
+
+  if (verification.expiresAt < new Date()) {
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+    return 'expired';
+  }
+
+  const [user] = await db.select().from(users).where(eq(users.id, verification.userId)).limit(1);
+  if (!user || user.isDeleted) {
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+    return 'invalid';
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ emailVerifiedAt: user.emailVerifiedAt ?? new Date(), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+    await tx.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
+  });
+
+  await writeAuditLog({
+    request,
+    restaurantId: user.restaurantId,
+    userId: user.id,
+    action: 'auth_email_verified',
+    resourceType: 'user',
+    resourceId: user.id,
+  });
+
+  return 'verified';
+};
+
 export const authRoutes = async (app: FastifyInstance) => {
   app.post('/auth/register', { preHandler: requireTrustedBrowserOrigin, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsed = RegisterSchema.safeParse(request.body);
@@ -145,12 +189,15 @@ export const authRoutes = async (app: FastifyInstance) => {
         }
 
         if (!(await hasRecentVerificationToken(existing.id))) {
-          sendUserVerificationEmail(existing).catch((error) =>
+          try {
+            await sendUserVerificationEmail(existing);
+          } catch (error) {
             request.log.error(
               { err: error, userId: existing.id, restaurantId: existing.restaurantId },
               'email verification delivery failed for existing account',
-            ),
-          );
+            );
+            return reply.code(503).send({ error: 'Nao foi possivel enviar o email agora. Tente novamente em alguns minutos.' });
+          }
         }
 
         return reply.code(202).send({
@@ -207,12 +254,15 @@ export const authRoutes = async (app: FastifyInstance) => {
     });
 
     if (requiresEmailVerification) {
-      sendUserVerificationEmail(result.user).catch((error) =>
+      try {
+        await sendUserVerificationEmail(result.user);
+      } catch (error) {
         request.log.error(
           { err: error, userId: result.user.id, restaurantId: result.restaurant.id },
           'email verification delivery failed',
-        ),
-      );
+        );
+        return reply.code(503).send({ error: 'Conta criada, mas nao foi possivel enviar o email agora. Tente reenviar em alguns minutos.' });
+      }
     }
 
     return reply.code(201).send({
@@ -225,46 +275,24 @@ export const authRoutes = async (app: FastifyInstance) => {
   app.get('/auth/verify-email', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const query = request.query as { token?: unknown };
     const token = typeof query.token === 'string' ? query.token.trim() : '';
-    if (!token || token.length > 200) return reply.redirect(verificationRedirectUrl('invalid'));
-
-    const [verification] = await db
-      .select()
-      .from(emailVerificationTokens)
-      .where(eq(emailVerificationTokens.tokenHash, sha256(token)))
-      .limit(1);
-
-    if (!verification) return reply.redirect(verificationRedirectUrl('invalid'));
-
-    if (verification.expiresAt < new Date()) {
-      await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
-      return reply.redirect(verificationRedirectUrl('expired'));
-    }
-
-    const [user] = await db.select().from(users).where(eq(users.id, verification.userId)).limit(1);
-    if (!user || user.isDeleted) {
-      await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
-      return reply.redirect(verificationRedirectUrl('invalid'));
-    }
-
-    await db.transaction(async (tx) => {
-      await tx
-        .update(users)
-        .set({ emailVerifiedAt: user.emailVerifiedAt ?? new Date(), updatedAt: new Date() })
-        .where(eq(users.id, user.id));
-      await tx.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, verification.id));
-    });
-
-    await writeAuditLog({
-      request,
-      restaurantId: user.restaurantId,
-      userId: user.id,
-      action: 'auth_email_verified',
-      resourceType: 'user',
-      resourceId: user.id,
-    });
-
-    return reply.redirect(verificationRedirectUrl('verified'));
+    const status = await verifyEmailToken(token, request);
+    return reply.redirect(verificationRedirectUrl(status));
   });
+
+  app.post(
+    '/auth/verify-email',
+    { preHandler: requireTrustedBrowserOrigin, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = VerifyEmailTokenSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'Link de confirmacao invalido.' });
+
+      const status = await verifyEmailToken(parsed.data.token, request);
+      if (status === 'expired') return reply.code(410).send({ error: 'Link expirado. Solicite um novo email.' });
+      if (status === 'invalid') return reply.code(400).send({ error: 'Link de confirmacao invalido.' });
+
+      return reply.send({ message: 'Email confirmado. Agora voce pode entrar no painel.' });
+    },
+  );
 
   app.post(
     '/auth/resend-verification',

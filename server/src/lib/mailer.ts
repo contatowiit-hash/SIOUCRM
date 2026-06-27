@@ -12,8 +12,8 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, '&#39;');
 
 const verificationUrl = (token: string) => {
-  const baseUrl = env.BACKEND_URL.replace(/\/+$/, '');
-  return `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const baseUrl = env.FRONTEND_URL.replace(/\/+$/, '');
+  return `${baseUrl}/verificar-email?token=${encodeURIComponent(token)}`;
 };
 
 export const isMailerConfigured = () => Boolean(env.ZOHO_SMTP_USER && env.ZOHO_SMTP_PASS);

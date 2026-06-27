@@ -11,7 +11,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLogo } from '../components/ui/AppLogo';
@@ -409,12 +409,32 @@ export const LegacyVerifyEmailPage = () => (
 );
 
 export const VerifyEmailPage = () => {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token')?.trim() || '';
+  const verificationStarted = useRef(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isVerifying, setIsVerifying] = useState(Boolean(token));
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<ResetPasswordInput>({ resolver: zodResolver(ResetPasswordSchema) });
+
+  useEffect(() => {
+    if (!token || verificationStarted.current) return;
+    verificationStarted.current = true;
+    setIsVerifying(true);
+    api
+      .verifyEmail({ token })
+      .then((result) => setMessage({ type: 'success', text: result.message }))
+      .catch((error) =>
+        setMessage({
+          type: 'error',
+          text: error instanceof Error ? error.message : 'Nao foi possivel confirmar seu email.',
+        }),
+      )
+      .finally(() => setIsVerifying(false));
+  }, [token]);
 
   const onSubmit = async (values: ResetPasswordInput) => {
     setMessage(null);
@@ -436,7 +456,11 @@ export const VerifyEmailPage = () => {
       active="verify"
     >
       <div className="rounded-2xl border border-neon/25 bg-neon/10 p-5 text-sm leading-7 text-sky-100">
-        Abra o link enviado para sua caixa de entrada. Depois disso, entre novamente no SIOU.
+        {token
+          ? isVerifying
+            ? 'Confirmando seu email...'
+            : 'Depois da confirmacao, entre novamente no SIOU.'
+          : 'Abra o link enviado para sua caixa de entrada. Depois disso, entre novamente no SIOU.'}
       </div>
 
       <form className="mt-5 space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -459,7 +483,7 @@ export const VerifyEmailPage = () => {
             {message.text}
           </div>
         ) : null}
-        <Button className="w-full" type="submit" disabled={isSubmitting}>
+        <Button className="w-full" type="submit" disabled={isSubmitting || isVerifying}>
           Reenviar email
         </Button>
       </form>
