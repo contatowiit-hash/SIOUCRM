@@ -324,7 +324,9 @@ test('verificacao de email usa SMTP no backend e token com hash', async () => {
   assert.match(auth, /VerifyEmailTokenSchema/);
   assert.match(auth, /\/auth\/resend-verification/);
   assert.match(auth, /generateVerificationToken/);
-  assert.match(auth, /await sendUserVerificationEmail\(result\.user\)/);
+  assert.match(auth, /queueUserVerificationEmail/);
+  assert.match(auth, /sendVerificationEmail\(user\.email, token\)\.catch/);
+  assert.match(auth, /await queueUserVerificationEmail\(result\.user, request, 'new account'\)/);
   assert.match(api, /resendVerification/);
   assert.match(api, /verifyEmail/);
   assert.match(authPages, /Confirmando seu email/);

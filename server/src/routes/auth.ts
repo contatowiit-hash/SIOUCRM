@@ -86,9 +86,18 @@ const verificationRedirectUrl = (status: 'verified' | 'invalid' | 'expired') => 
   return url.toString();
 };
 
-const sendUserVerificationEmail = async (user: typeof users.$inferSelect) => {
+const queueUserVerificationEmail = async (
+  user: typeof users.$inferSelect,
+  request: FastifyRequest,
+  context: string,
+) => {
   const token = await generateVerificationToken(user.id);
-  await sendVerificationEmail(user.email, token);
+  sendVerificationEmail(user.email, token).catch((error) =>
+    request.log.error(
+      { err: error, userId: user.id, restaurantId: user.restaurantId },
+      `email verification delivery failed: ${context}`,
+    ),
+  );
 };
 
 const resendVerificationAcceptedMessage =
@@ -189,15 +198,7 @@ export const authRoutes = async (app: FastifyInstance) => {
         }
 
         if (!(await hasRecentVerificationToken(existing.id))) {
-          try {
-            await sendUserVerificationEmail(existing);
-          } catch (error) {
-            request.log.error(
-              { err: error, userId: existing.id, restaurantId: existing.restaurantId },
-              'email verification delivery failed for existing account',
-            );
-            return reply.code(503).send({ error: 'Nao foi possivel enviar o email agora. Tente novamente em alguns minutos.' });
-          }
+          await queueUserVerificationEmail(existing, request, 'existing account');
         }
 
         return reply.code(202).send({
@@ -254,15 +255,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     });
 
     if (requiresEmailVerification) {
-      try {
-        await sendUserVerificationEmail(result.user);
-      } catch (error) {
-        request.log.error(
-          { err: error, userId: result.user.id, restaurantId: result.restaurant.id },
-          'email verification delivery failed',
-        );
-        return reply.code(503).send({ error: 'Conta criada, mas nao foi possivel enviar o email agora. Tente reenviar em alguns minutos.' });
-      }
+      await queueUserVerificationEmail(result.user, request, 'new account');
     }
 
     return reply.code(201).send({
@@ -314,9 +307,9 @@ export const authRoutes = async (app: FastifyInstance) => {
       if (!isMailerConfigured()) return reply.code(503).send({ error: 'Envio de email indisponivel no momento' });
 
       try {
-        await sendUserVerificationEmail(user);
+        await queueUserVerificationEmail(user, request, 'resend');
       } catch (error) {
-        request.log.error({ err: error, userId: user.id, restaurantId: user.restaurantId }, 'email verification resend failed');
+        request.log.error({ err: error, userId: user.id, restaurantId: user.restaurantId }, 'email verification token generation failed');
         return reply.code(503).send({ error: 'Nao foi possivel enviar o email agora' });
       }
 
