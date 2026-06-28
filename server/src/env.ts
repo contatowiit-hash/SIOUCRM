@@ -68,6 +68,8 @@ const EnvSchema = z.object({
   GOOMER_PARTNER_TOKEN: optionalSecret,
   ZOHO_SMTP_USER: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   ZOHO_SMTP_PASS: optionalSecret,
+  RESEND_API_KEY: optionalSecret,
+  EMAIL_FROM: optionalString,
   DEV_ACCOUNT_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   DEV_ACCOUNT_PASSWORD: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(10).optional()),
 });
@@ -109,6 +111,7 @@ const forbiddenFrontendSecretKeys = [
   'VITE_GOOMER_PARTNER_TOKEN',
   'VITE_ZOHO_SMTP_USER',
   'VITE_ZOHO_SMTP_PASS',
+  'VITE_RESEND_API_KEY',
 ] as const;
 
 const exposedFrontendSecrets = forbiddenFrontendSecretKeys.filter((key) => Boolean(process.env[key]?.trim()));

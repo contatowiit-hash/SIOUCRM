@@ -223,6 +223,7 @@ test('redaction remove credenciais de mensagens e stack traces', () => {
     'WHATSAPP_ACCESS_TOKEN=whatsapp-fake-token-value',
     'DATABASE_URL=postgresql://user:password@localhost:5432/syntra',
     'ZOHO_SMTP_PASS=zoho-fake-password',
+    'RESEND_API_KEY=re_fake_123456789',
   ];
 
   for (const sample of samples) {
@@ -312,7 +313,11 @@ test('verificacao de email usa SMTP no backend e token com hash', async () => {
   assert.match(envSource, /ZOHO_SMTP_USER/);
   assert.match(envSource, /ZOHO_SMTP_PASS/);
   assert.match(envSource, /VITE_ZOHO_SMTP_PASS/);
+  assert.match(envSource, /RESEND_API_KEY/);
+  assert.match(envSource, /EMAIL_FROM/);
+  assert.match(envSource, /VITE_RESEND_API_KEY/);
   assert.match(mailer, /smtp\.zoho\.com/);
+  assert.match(mailer, /api\.resend\.com\/emails/);
   assert.match(mailer, /connectionTimeout/);
   assert.match(mailer, /socketTimeout/);
   assert.match(mailer, /FRONTEND_URL/);

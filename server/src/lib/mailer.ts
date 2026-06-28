@@ -16,7 +16,18 @@ const verificationUrl = (token: string) => {
   return `${baseUrl}/verificar-email?token=${encodeURIComponent(token)}`;
 };
 
-export const isMailerConfigured = () => Boolean(env.ZOHO_SMTP_USER && env.ZOHO_SMTP_PASS);
+const fromAddress = () => env.EMAIL_FROM ?? (env.ZOHO_SMTP_USER ? `"${appName}" <${env.ZOHO_SMTP_USER}>` : undefined);
+
+export const isMailerConfigured = () =>
+  Boolean((env.RESEND_API_KEY && fromAddress()) || (env.ZOHO_SMTP_USER && env.ZOHO_SMTP_PASS));
+
+type MailPayload = {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+};
 
 const getTransporter = () => {
   if (!env.ZOHO_SMTP_USER || !env.ZOHO_SMTP_PASS) {
@@ -37,12 +48,39 @@ const getTransporter = () => {
   });
 };
 
+const sendWithResend = async (payload: MailPayload) => {
+  if (!env.RESEND_API_KEY) throw new Error('EMAIL_API_NOT_CONFIGURED');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`EMAIL_API_REJECTED_${response.status}`);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 export const sendVerificationEmail = async (to: string, token: string) => {
   const link = verificationUrl(token);
   const safeLink = escapeHtml(link);
+  const from = fromAddress();
+  if (!from) throw new Error('EMAIL_FROM_NOT_CONFIGURED');
 
-  await getTransporter().sendMail({
-    from: `"${appName}" <${env.ZOHO_SMTP_USER}>`,
+  const payload = {
+    from,
     to,
     subject: `Confirme seu email - ${appName}`,
     text: [
@@ -67,5 +105,12 @@ export const sendVerificationEmail = async (to: string, token: string) => {
         <p style="font-size:12px;line-height:1.6;color:#6b7280;word-break:break-all">Link direto: ${safeLink}</p>
       </div>
     `,
-  });
+  };
+
+  if (env.RESEND_API_KEY) {
+    await sendWithResend(payload);
+    return;
+  }
+
+  await getTransporter().sendMail(payload);
 };

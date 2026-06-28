@@ -22,6 +22,8 @@ REFRESH_TOKEN_SECRET=outra-chave-grande-com-mais-de-32-caracteres
 WEBHOOK_SECRET=um-segredo-grande-para-validar-webhooks
 ZOHO_SMTP_USER=siou@sioucrm.com
 ZOHO_SMTP_PASS=sua-senha-de-app-do-zoho
+RESEND_API_KEY=re_sua-chave-da-resend
+EMAIL_FROM=SIOU <siou@sioucrm.com>
 ```
 
 Use a URL pooled da Neon em `DATABASE_URL` e a URL direct em `DIRECT_DATABASE_URL`.
@@ -29,7 +31,10 @@ Use a URL pooled da Neon em `DATABASE_URL` e a URL direct em `DIRECT_DATABASE_UR
 ## Produção com Vercel + Render
 
 Na Render ficam os segredos do backend: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`,
-`ZOHO_SMTP_USER` e `ZOHO_SMTP_PASS`.
+`RESEND_API_KEY`, `EMAIL_FROM`, `ZOHO_SMTP_USER` e `ZOHO_SMTP_PASS`.
+
+Para envio de email em producao, prefira `RESEND_API_KEY` com `EMAIL_FROM`. O Zoho SMTP fica como
+fallback, mas pode falhar em hospedagens que bloqueiam conexoes SMTP de saida.
 
 Na Vercel, configure `BACKEND_URL` apontando para a URL pública da Render. Assim o site continua
 chamando `/api` no próprio domínio e a Vercel encaminha a requisição para o backend real.
