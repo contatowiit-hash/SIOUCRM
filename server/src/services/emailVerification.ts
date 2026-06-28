@@ -5,7 +5,7 @@ import { emailVerificationTokens } from '../db/schema.js';
 import { sha256 } from '../utils/security.js';
 
 const verificationTtlMs = 24 * 60 * 60 * 1000;
-const resendCooldownMs = 2 * 60 * 1000;
+const resendCooldownMs = 30 * 1000;
 
 export const generateVerificationToken = async (userId: string) => {
   const token = randomBytes(32).toString('hex');
