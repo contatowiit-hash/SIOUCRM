@@ -21,6 +21,7 @@ const hopByHopHeaders = new Set([
   'transfer-encoding',
   'upgrade',
 ]);
+const proxyTimeoutMs = 25_000;
 
 export const normalizeVercelApiUrl = (url?: string) => {
   const parsed = new URL(url ?? '/', 'http://vercel.local');
@@ -85,11 +86,15 @@ const proxyToBackend = async (req: IncomingMessage, res: ServerResponse) =>
       },
     );
 
+    proxyReq.setTimeout(proxyTimeoutMs, () => {
+      proxyReq.destroy(new Error('UPSTREAM_TIMEOUT'));
+    });
+
     proxyReq.on('error', () => {
       if (!res.headersSent) {
-        res.statusCode = 502;
+        res.statusCode = 504;
         res.setHeader('content-type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ error: 'Servico temporariamente indisponivel.' }));
+        res.end(JSON.stringify({ error: 'Servico demorou para responder. Tente novamente em alguns instantes.' }));
       }
       resolve();
     });

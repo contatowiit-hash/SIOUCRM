@@ -166,6 +166,8 @@ test('deploy da Vercel encaminha webhooks e limita conexoes serverless', async (
   assert.match(handler, /BACKEND_URL/);
   assert.match(handler, /shouldProxyToBackend/);
   assert.match(handler, /proxyToBackend/);
+  assert.match(handler, /proxyTimeoutMs/);
+  assert.match(handler, /UPSTREAM_TIMEOUT/);
   assert.match(handler, /searchParams\.get\('__path'\)/);
   assert.match(handler, /req\.url = normalizeVercelApiUrl\(req\.url\)/);
   assert.match(database, /max:\s*process\.env\.VERCEL \? 1 : 10/);
@@ -311,6 +313,8 @@ test('verificacao de email usa SMTP no backend e token com hash', async () => {
   assert.match(envSource, /ZOHO_SMTP_PASS/);
   assert.match(envSource, /VITE_ZOHO_SMTP_PASS/);
   assert.match(mailer, /smtp\.zoho\.com/);
+  assert.match(mailer, /connectionTimeout/);
+  assert.match(mailer, /socketTimeout/);
   assert.match(mailer, /FRONTEND_URL/);
   assert.match(mailer, /\/verificar-email\?token=/);
   assert.match(mailer, /sendVerificationEmail/);

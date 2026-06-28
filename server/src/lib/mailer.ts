@@ -27,6 +27,9 @@ const getTransporter = () => {
     host: 'smtp.zoho.com',
     port: 465,
     secure: true,
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
     auth: {
       user: env.ZOHO_SMTP_USER,
       pass: env.ZOHO_SMTP_PASS,
