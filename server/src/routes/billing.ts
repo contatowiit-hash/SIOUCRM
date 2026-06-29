@@ -33,6 +33,9 @@ const checkoutPriceByPlan = {
   founder_lifetime: STRIPE_FOUNDER_LIFETIME_PRICE_ID,
 } as const;
 
+const stripeCheckoutTimeoutMs = 12_000;
+const stripePriceValidationTimeoutMs = 2_500;
+
 class CheckoutPublicError extends Error {
   constructor(
     public readonly publicMessage: string,
@@ -74,12 +77,26 @@ const checkoutAppUrl = (request: FastifyRequest) => {
 
 let overagePriceValidationCache: { checkedAt: number; valid: boolean } | null = null;
 
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const isAvailableMeteredPrice = async (priceId: string) => {
   if (!env.STRIPE_SECRET_KEY) return false;
 
-  const response = await fetch(`https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}`, {
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
-  });
+  const response = await fetchWithTimeout(
+    `https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}`,
+    {
+      headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+    },
+    stripePriceValidationTimeoutMs,
+  );
   if (!response.ok) return false;
 
   const price = (await response.json().catch(() => null)) as
@@ -158,16 +175,27 @@ const createCheckoutSession = async ({
     body.set('payment_intent_data[metadata][plan]', plan);
   }
 
-  const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      'https://api.stripe.com/v1/checkout/sessions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      },
+      stripeCheckoutTimeoutMs,
+    );
+  } catch {
+    throw new CheckoutPublicError('O Stripe demorou para responder. Tente novamente em alguns instantes.', 504, {
+      reason: 'stripe_checkout_timeout',
+    });
+  }
 
-  const data = (await response.json()) as {
+  const data = (await response.json().catch(() => ({}))) as {
     id?: string;
     url?: string;
     error?: { code?: string; message?: string; param?: string; type?: string };

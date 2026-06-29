@@ -128,6 +128,10 @@ test('Stripe checkout usa dominio confiavel da requisicao para voltar ao site', 
   assert.doesNotMatch(billing, /success_url: `\$\{env\.APP_URL\}\/app\/planos/);
   assert.match(plans, /process\.env\[key\]\?\.trim\(\) \|\| fallback/);
   assert.match(billing, /CheckoutPublicError/);
+  assert.match(billing, /fetchWithTimeout/);
+  assert.match(billing, /stripeCheckoutTimeoutMs/);
+  assert.match(billing, /stripePriceValidationTimeoutMs/);
+  assert.match(billing, /stripe_checkout_timeout/);
   assert.match(billing, /missing_stripe_secret/);
   assert.match(billing, /resource_missing/);
   assert.doesNotMatch(billing, /request\.log\.(?:warn|error|info)\([^)]*data\.error\?\.message/s);
@@ -172,7 +176,7 @@ test('deploy da Vercel encaminha webhooks e limita conexoes serverless', async (
   assert.match(handler, /BACKEND_URL/);
   assert.match(handler, /shouldProxyToBackend/);
   assert.match(handler, /proxyToBackend/);
-  assert.match(handler, /proxyTimeoutMs/);
+  assert.match(handler, /proxyTimeoutMs = 55_000/);
   assert.match(handler, /UPSTREAM_TIMEOUT/);
   assert.match(handler, /searchParams\.get\('__path'\)/);
   assert.match(handler, /req\.url = normalizeVercelApiUrl\(req\.url\)/);

@@ -21,7 +21,7 @@ const hopByHopHeaders = new Set([
   'transfer-encoding',
   'upgrade',
 ]);
-const proxyTimeoutMs = 25_000;
+const proxyTimeoutMs = 55_000;
 
 export const normalizeVercelApiUrl = (url?: string) => {
   const parsed = new URL(url ?? '/', 'http://vercel.local');
