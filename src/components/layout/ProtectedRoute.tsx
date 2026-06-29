@@ -10,7 +10,6 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   if (loading) return <LoadingScreen />;
   const loginPath = `/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
   if (!session) return <Navigate to={loginPath} replace state={{ from: location }} />;
-  if (!user?.email_confirmed_at) return <Navigate to="/verificar-email" replace />;
   if (!restaurantId) return <Navigate to="/404" replace />;
 
   return <>{children}</>;

@@ -259,6 +259,8 @@ export const LoginPage = () => {
 };
 
 export const RegisterPage = () => {
+  const navigate = useNavigate();
+  const { startApiSession } = useAuth();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const {
     register,
@@ -270,14 +272,8 @@ export const RegisterPage = () => {
     setMessage(null);
     try {
       const result = await api.register(values);
-      setMessage({
-        type: 'success',
-        text: result.message
-          ? result.message
-          : result.requires_email_verification
-          ? 'Conta criada. Verifique seu email antes de acessar o painel.'
-          : 'Conta criada. Agora entre para escolher seu plano.',
-      });
+      startApiSession(result);
+      navigate('/app/planos', { replace: true });
     } catch (error) {
       setMessage({
         type: 'error',

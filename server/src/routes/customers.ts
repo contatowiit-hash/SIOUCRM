@@ -3,6 +3,7 @@ import { and, desc, eq, ilike } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { customers } from '../db/schema.js';
 import { CreateCustomerSchema } from '../schemas.js';
+import { requirePlan } from '../middleware/requirePlan.js';
 import { requireRoles } from '../plugins/auth.js';
 import { toBasicCustomerDto, toCustomerDto } from '../utils/format.js';
 import { sanitizePhone, sanitizeText } from '../utils/security.js';
@@ -11,7 +12,7 @@ import { paginationMeta, parsePagination, type PaginationQuery } from '../utils/
 
 
 export const customerRoutes = async (app: FastifyInstance) => {
-  app.get('/customers', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager', 'agent')] }, async (request, reply) => {
+  app.get('/customers', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager', 'agent'), requirePlan('plus')] }, async (request, reply) => {
     const query = request.query as { search?: string; status?: string } & PaginationQuery;
     const auth = request.auth!;
     const { page, pageSize, offset } = parsePagination(query);
@@ -44,7 +45,7 @@ export const customerRoutes = async (app: FastifyInstance) => {
     }
   });
 
-  app.get('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager', 'agent')] }, async (request, reply) => {
+  app.get('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager', 'agent'), requirePlan('plus')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const auth = request.auth!;
     const [customer] = await db
@@ -57,7 +58,7 @@ export const customerRoutes = async (app: FastifyInstance) => {
     return { data: auth.role === 'agent' ? toBasicCustomerDto(customer) : toCustomerDto(customer) };
   });
 
-  app.post('/customers', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.post('/customers', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const parsed = CreateCustomerSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Dados inválidos' });
 
@@ -114,7 +115,7 @@ export const customerRoutes = async (app: FastifyInstance) => {
     }
   });
 
-  app.patch('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.patch('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = CreateCustomerSchema.partial().safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Dados inválidos' });
@@ -160,7 +161,7 @@ export const customerRoutes = async (app: FastifyInstance) => {
     return { data: toCustomerDto(updated) };
   });
 
-  app.delete('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.delete('/customers/:id', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const auth = request.auth!;
     const [deleted] = await db

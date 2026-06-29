@@ -70,6 +70,7 @@ const planLabels: Record<string, string> = {
 const DEV_PLAN_STORAGE_KEY = 'syntra_dev_plan';
 
 const isKnownPlan = (value: string | null | undefined): value is string => Boolean(value && planLabels[value]);
+const paidPlans = new Set(['plus', 'starter', 'pro', 'premium', 'lifetime', 'founder_lifetime']);
 
 export const DashboardLayout = () => {
   const { restaurant, profile, session, signOut, apiUser } = useAuth();
@@ -105,10 +106,14 @@ export const DashboardLayout = () => {
 
   const rawPlan = isDeveloper ? devPlan : currentRestaurant?.plan || 'free';
   const currentPlan = rawPlan;
+  const planLocked = !demoMode && !isDeveloper && !paidPlans.has(currentPlan);
   const visibleMenu = menu
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => demoMode || Boolean(profile?.role && item.roles.includes(profile.role))),
+      items: section.items.filter((item) => {
+        if (planLocked) return item.to === 'meu-plano' || (item.to === 'planos' && profile?.role === 'owner');
+        return demoMode || Boolean(profile?.role && item.roles.includes(profile.role));
+      }),
     }))
     .filter((section) => section.items.length > 0);
 
@@ -120,7 +125,7 @@ export const DashboardLayout = () => {
     <div className="min-h-screen bg-ink text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-line bg-[#070912]/95 backdrop-blur-xl lg:flex lg:flex-col">
         <div className="border-b border-line p-5">
-          <AppLogo to={demoMode ? '/demo/dashboard' : '/app/dashboard'} />
+          <AppLogo to={demoMode ? '/demo/dashboard' : planLocked ? '/app/planos' : '/app/dashboard'} />
         </div>
         <nav className="flex-1 space-y-7 overflow-y-auto p-4">
           {visibleMenu.map((section) => (
@@ -184,7 +189,7 @@ export const DashboardLayout = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 lg:hidden">
               <PanelLeft className="h-5 w-5 text-neon" />
-              <AppLogo to={demoMode ? '/demo/dashboard' : '/app/dashboard'} />
+              <AppLogo to={demoMode ? '/demo/dashboard' : planLocked ? '/app/planos' : '/app/dashboard'} />
             </div>
             <div className="hidden lg:block">
               <p className="text-xs font-semibold text-neon">

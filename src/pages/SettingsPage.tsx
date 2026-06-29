@@ -1,19 +1,19 @@
 import { Bell, Building2, Link2, Save, ShieldCheck, Upload } from 'lucide-react';
+import { IntegrationsPanel } from '../components/IntegrationsPanel';
+import { WhatsAppConnect } from '../components/WhatsAppConnect';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { PageHeader } from '../components/ui/PageHeader';
-import { WhatsAppConnect } from '../components/WhatsAppConnect';
-import { IntegrationsPanel } from '../components/IntegrationsPanel';
 import { useDemoMode } from '../hooks/useDemoMode';
 import { useAuth } from '../providers/AuthProvider';
 
 const checklist = [
-  'RLS ativado em todas as tabelas',
-  'service_role apenas em Edge Functions',
-  'Webhooks com HMAC-SHA256',
+  'Dados separados por restaurante',
+  'Códigos protegidos no backend',
+  'Webhooks com assinatura segura',
   'Headers de segurança configurados',
   'Logs sem senhas, tokens ou cartão',
-  'Email confirmation obrigatório',
+  'CRM bloqueado até o plano estar ativo',
 ];
 
 export const SettingsPage = () => {
@@ -24,8 +24,12 @@ export const SettingsPage = () => {
     <div>
       <PageHeader
         title="Configurações"
-        description="Dados do restaurante, integrações, segurança, sessões, uploads e preferências de comunicação."
-        actions={<Button icon={<Save className="h-4 w-4" />} disabled={demoMode}>Salvar alterações</Button>}
+        description="Dados do restaurante, WhatsApp, pagamentos, segurança e preferências."
+        actions={
+          <Button icon={<Save className="h-4 w-4" />} disabled={demoMode}>
+            Salvar alterações
+          </Button>
+        }
       />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
@@ -38,11 +42,11 @@ export const SettingsPage = () => {
             <div className="grid gap-4 md:grid-cols-2">
               <label>
                 <span className="mb-2 block text-sm font-semibold text-slate-200">Nome do restaurante</span>
-                <input className="form-field disabled:cursor-not-allowed disabled:opacity-70" defaultValue={restaurant?.name || 'La Piazza'} disabled={demoMode} />
+                <input className="form-field disabled:cursor-not-allowed disabled:opacity-70" defaultValue={restaurant?.name || ''} disabled={demoMode} />
               </label>
               <label>
                 <span className="mb-2 block text-sm font-semibold text-slate-200">Telefone</span>
-                <input className="form-field disabled:cursor-not-allowed disabled:opacity-70" defaultValue="+55 11 99999-9999" disabled={demoMode} />
+                <input className="form-field disabled:cursor-not-allowed disabled:opacity-70" defaultValue="" disabled={demoMode} />
               </label>
               <label>
                 <span className="mb-2 block text-sm font-semibold text-slate-200">Categoria</span>
@@ -62,7 +66,7 @@ export const SettingsPage = () => {
                 <span className="mb-2 block text-sm font-semibold text-slate-200">Logo</span>
                 <button className="form-field flex items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-70" disabled={demoMode}>
                   <Upload className="h-4 w-4 text-neon" />
-                  Upload seguro até 5MB
+                  Upload seguro até 5 MB
                 </button>
               </label>
             </div>

@@ -248,15 +248,15 @@ export const api = {
     password: string;
     confirmPassword: string;
   }) {
-    return apiFetch<{
-      user?: ApiUser;
-      restaurant?: ApiRestaurant;
+    const result = await apiFetch<AuthResponse & {
       requires_email_verification: boolean;
       message?: string;
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
     });
+    setAccessToken(result.access_token);
+    return result;
   },
   async resendVerification(input: { email: string }) {
     return apiFetch<{ message: string }>('/auth/resend-verification', {
@@ -330,6 +330,12 @@ export const api = {
   },
   async createCampaign(input: unknown) {
     return apiFetch<{ data: Campaign }>('/campaigns', { method: 'POST', body: JSON.stringify(input) });
+  },
+  async sendCampaign(id: string) {
+    return apiFetch<{ data: Campaign; sent: number; skipped: number; failed: number; limit: number }>(
+      `/campaigns/${id}/send`,
+      { method: 'POST' },
+    );
   },
   async automations() {
     return apiFetch<{ data: Automation[] }>('/automations');

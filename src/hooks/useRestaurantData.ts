@@ -207,6 +207,25 @@ export const useCreateCampaign = () => {
   });
 };
 
+export const useSendCampaign = () => {
+  const { accessToken, restaurantId } = useAuth();
+  const demoMode = useDemoMode();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (demoMode) throw demoReadOnlyError();
+      return api.sendCampaign(id);
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData<Campaign[]>(
+        ['campaigns', demoMode ? 'demo' : restaurantId, accessToken ? 'api' : 'local'],
+        (current) => (current || []).map((campaign) => (campaign.id === result.data.id ? result.data : campaign)),
+      );
+    },
+  });
+};
+
 export const useAutomations = () => {
   const { accessToken, restaurantId } = useAuth();
   const demoMode = useDemoMode();

@@ -179,6 +179,54 @@ const menuCategoryBlocks = (menu: string) => {
   }));
 };
 
+const productStopWords = new Set([
+  'cardapio',
+  'menu',
+  'preco',
+  'valor',
+  'quanto',
+  'custa',
+  'tem',
+  'voces',
+  'serve',
+  'servido',
+  'quero',
+  'pedido',
+  'pode',
+  'mandar',
+  'pizza',
+  'pizzas',
+  'bebida',
+  'bebidas',
+  'lanche',
+  'lanches',
+  'sobremesa',
+  'sobremesas',
+]);
+
+const productWords = (value: string) =>
+  normalizeForMatch(value)
+    .split(' ')
+    .filter((word) => word.length >= 4 && !productStopWords.has(word));
+
+const productLines = (menu: string) =>
+  menu
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('-') && pricePattern.test(line));
+
+const findRequestedProductLine = (menu: string, customerMessage: string) => {
+  const messageWords = new Set(productWords(customerMessage));
+  if (!messageWords.size) return null;
+
+  return (
+    productLines(menu).find((line) => {
+      const lineWords = productWords(line.replace(pricePattern, ''));
+      return lineWords.some((word) => messageWords.has(word));
+    }) ?? null
+  );
+};
+
 export const buildDirectMenuReply = (menuText: string, customerMessage: string) => {
   const menu = menuText.trim();
   if (!menu) return null;
@@ -194,6 +242,11 @@ export const buildDirectMenuReply = (menuText: string, customerMessage: string) 
     );
   });
   if (requestedCategory) return `Claro! Estas são as opções de ${requestedCategory.category}:\n\n${requestedCategory.content}`;
+
+  const requestedProduct = findRequestedProductLine(menu, customerMessage);
+  if (requestedProduct) {
+    return `Temos sim: ${requestedProduct.replace(/^-\s*/, '')}`;
+  }
 
   if (!generalMenuRequestPattern.test(normalizedMessage)) return null;
   if (menu.length <= 1_700) return `Claro! Este é o nosso cardápio:\n\n${menu}`;

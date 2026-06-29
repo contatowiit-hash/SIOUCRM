@@ -112,8 +112,8 @@ test('interface diferencia cadastro externo de integrações conectáveis', asyn
   assert.match(panel, /not_configured: 'Cadastro necessário'/);
   assert.match(panel, /Identificador da sua InfinitePay/);
   assert.match(panel, /api\.connectPayment\(payment\.provider, \{ handle:/);
-  assert.match(panel, /Traga as vendas do seu caixa para o Syntra automaticamente/);
-  assert.doesNotMatch(panel, /Traga as vendas do seu caixa para o SIOU automaticamente/);
+  assert.match(panel, /Receber pagamentos/);
+  assert.doesNotMatch(panel, /PDV|Goomer|caixa para o Syntra|caixa para o SIOU/);
 });
 
 test('PagBank e InfinitePay possuem fluxos reais de cobrança', async () => {

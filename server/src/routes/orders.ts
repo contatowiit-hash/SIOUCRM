@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { customers, orderItems, orders, paymentConnections } from '../db/schema.js';
 import { env } from '../env.js';
 import { CreateOrderSchema } from '../schemas.js';
+import { requirePlan } from '../middleware/requirePlan.js';
 import { requireRoles } from '../plugins/auth.js';
 import { toOrderDto } from '../utils/format.js';
 import { sanitizeText } from '../utils/security.js';
@@ -23,7 +24,7 @@ const PixChargeSchema = z.object({
 });
 
 export const orderRoutes = async (app: FastifyInstance) => {
-  app.get('/orders', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request) => {
+  app.get('/orders', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request) => {
     const auth = request.auth!;
     const { page, pageSize, offset } = parsePagination(request.query as PaginationQuery);
     const orderRows = await db
@@ -48,7 +49,7 @@ export const orderRoutes = async (app: FastifyInstance) => {
     };
   });
 
-  app.post('/orders', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.post('/orders', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const parsed = CreateOrderSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Dados invalidos. Revise o pedido e tente novamente.' });
@@ -113,7 +114,7 @@ export const orderRoutes = async (app: FastifyInstance) => {
     return reply.code(201).send({ data: toOrderDto(created.order, created.items) });
   });
 
-  app.post('/orders/:id/pix-charge', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.post('/orders/:id/pix-charge', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const auth = request.auth!;
     const orderId = z.string().uuid().safeParse((request.params as { id?: string }).id);
     const body = PixChargeSchema.safeParse(request.body ?? {});
@@ -229,7 +230,7 @@ export const orderRoutes = async (app: FastifyInstance) => {
     }
   });
 
-  app.post('/orders/:id/payment-link', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.post('/orders/:id/payment-link', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const auth = request.auth!;
     const orderId = z.string().uuid().safeParse((request.params as { id?: string }).id);
     const body = z.object({ provider: z.literal('infinitepay') }).safeParse(request.body);

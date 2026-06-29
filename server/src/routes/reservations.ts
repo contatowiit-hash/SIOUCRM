@@ -3,13 +3,14 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { customers, reservations } from '../db/schema.js';
 import { CreateReservationSchema, UpdateReservationStatusSchema } from '../schemas.js';
+import { requirePlan } from '../middleware/requirePlan.js';
 import { requireRoles } from '../plugins/auth.js';
 import { toReservationDto } from '../utils/format.js';
 import { sanitizePhone, sanitizeText } from '../utils/security.js';
 import { writeAuditLog } from '../utils/audit.js';
 
 export const reservationRoutes = async (app: FastifyInstance) => {
-  app.get('/reservations', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request) => {
+  app.get('/reservations', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request) => {
     const query = request.query as { date?: string };
     const auth = request.auth!;
     const filters = [eq(reservations.restaurantId, auth.restaurantId), eq(reservations.isDeleted, false)];
@@ -18,7 +19,7 @@ export const reservationRoutes = async (app: FastifyInstance) => {
     return { data: rows.map(toReservationDto) };
   });
 
-  app.post('/reservations', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.post('/reservations', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const parsed = CreateReservationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Dados inválidos' });
     const auth = request.auth!;
@@ -62,7 +63,7 @@ export const reservationRoutes = async (app: FastifyInstance) => {
     return reply.code(201).send({ data: toReservationDto(created) });
   });
 
-  app.patch('/reservations/:id/status', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager')] }, async (request, reply) => {
+  app.patch('/reservations/:id/status', { preHandler: [app.authenticate, requireRoles('owner', 'admin', 'manager'), requirePlan('plus')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsed = UpdateReservationStatusSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Dados inválidos' });

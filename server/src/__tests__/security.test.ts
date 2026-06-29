@@ -297,48 +297,28 @@ test('cookie de renovacao usa politica segura e consistente', async () => {
   assert.match(api, /async refresh\(\)\s*\{\s*return refreshAccessToken\(\);\s*\}/s);
 });
 
-test('verificacao de email usa SMTP no backend e token com hash', async () => {
+test('cadastro entra direto, cria sessao segura e leva para planos', async () => {
   const auth = await read('server/src/routes/auth.ts');
-  const schema = await read('server/src/db/schema.ts');
-  const envSource = await read('server/src/env.ts');
-  const mailer = await read('server/src/lib/mailer.ts');
-  const service = await read('server/src/services/emailVerification.ts');
   const api = await read('src/lib/api.ts');
   const authPages = await read('src/pages/AuthPages.tsx');
-  const authProvider = await read('src/providers/AuthProvider.tsx');
+  const protectedRoute = await read('src/components/layout/ProtectedRoute.tsx');
+  const app = await read('src/App.tsx');
+  const layout = await read('src/components/layout/DashboardLayout.tsx');
 
-  assert.match(schema, /emailVerificationTokens/);
-  assert.match(schema, /tokenHash: text\('token_hash'\)/);
-  assert.doesNotMatch(schema, /token:\s*text\('token'\)/);
-  assert.match(envSource, /ZOHO_SMTP_USER/);
-  assert.match(envSource, /ZOHO_SMTP_PASS/);
-  assert.match(envSource, /VITE_ZOHO_SMTP_PASS/);
-  assert.match(envSource, /RESEND_API_KEY/);
-  assert.match(envSource, /EMAIL_FROM/);
-  assert.match(envSource, /VITE_RESEND_API_KEY/);
-  assert.match(mailer, /smtp\.zoho\.com/);
-  assert.match(mailer, /api\.resend\.com\/emails/);
-  assert.match(mailer, /connectionTimeout/);
-  assert.match(mailer, /socketTimeout/);
-  assert.match(mailer, /FRONTEND_URL/);
-  assert.match(mailer, /\/verificar-email\?token=/);
-  assert.match(mailer, /sendVerificationEmail/);
-  assert.match(service, /randomBytes\(32\)\.toString\('hex'\)/);
-  assert.match(service, /sha256\(token\)/);
-  assert.match(auth, /\/auth\/verify-email/);
-  assert.match(auth, /VerifyEmailTokenSchema/);
-  assert.match(auth, /\/auth\/resend-verification/);
-  assert.match(auth, /generateVerificationToken/);
-  assert.match(auth, /sendUserVerificationEmail/);
-  assert.match(auth, /await sendVerificationEmail\(user\.email, token\)/);
-  assert.match(auth, /await sendUserVerificationEmail\(result\.user\)/);
-  assert.match(service, /const resendCooldownMs = 30 \* 1000/);
-  assert.match(api, /resendVerification/);
-  assert.match(api, /verifyEmail/);
-  assert.match(authPages, /Confirmando seu email/);
-  assert.match(authPages, /Reenviar email/);
-  assert.match(authProvider, /email_confirmed_at:\s*user\.email_verified_at/);
-  assert.doesNotMatch(authProvider, /email_verified_at\s*\|\|\s*new Date/);
+  assert.match(auth, /emailVerifiedAt:\s*new Date\(\)/);
+  assert.match(auth, /reply\.setCookie\(refreshCookieName, tokens\.refreshToken, refreshCookieOptions\(request\)\)/);
+  assert.match(auth, /access_token:\s*tokens\.accessToken/);
+  assert.match(auth, /requires_email_verification:\s*false/);
+  assert.doesNotMatch(auth, /sendUserVerificationEmail/);
+  assert.doesNotMatch(auth, /generateVerificationToken/);
+  assert.doesNotMatch(auth, /requiresEmailVerification/);
+  assert.match(api, /setAccessToken\(result\.access_token\)/);
+  assert.match(authPages, /startApiSession\(result\)/);
+  assert.match(authPages, /navigate\('\/app\/planos'/);
+  assert.doesNotMatch(protectedRoute, /email_confirmed_at/);
+  assert.match(app, /RequirePaidPlan/);
+  assert.match(app, /paidPlans\.has\(restaurant\?\.plan \|\| 'free'\)/);
+  assert.match(layout, /planLocked/);
 });
 
 test('RBAC protege cobranca, IA, automacoes e configuracao do WhatsApp', async () => {
@@ -351,6 +331,25 @@ test('RBAC protege cobranca, IA, automacoes e configuracao do WhatsApp', async (
   assert.match(aiSettings, /requireRoles\('owner', 'admin'\)/);
   assert.match(automations, /requireRoles\('owner', 'admin'\)/);
   assert.match(whatsapp, /gateway\/session'.*requireRoles\('owner', 'admin'\)/s);
+});
+
+test('campanhas enviam WhatsApp pelo backend com plano, limite e trava anti-spam', async () => {
+  const campaigns = await read('server/src/routes/campaigns.ts');
+  const page = await read('src/pages/CampaignsPage.tsx');
+  const hooks = await read('src/hooks/useRestaurantData.ts');
+  const api = await read('src/lib/api.ts');
+
+  assert.match(campaigns, /\/campaigns\/:id\/send/);
+  assert.match(campaigns, /requirePlan\('plus'\)/);
+  assert.match(campaigns, /requireRoles\('owner', 'admin', 'manager'\)/);
+  assert.match(campaigns, /const campaignSendLimit = 25/);
+  assert.match(campaigns, /checkWhatsAppSendAllowed/);
+  assert.match(campaigns, /recordUsage\(auth\.restaurantId, 'whatsapp'\)/);
+  assert.match(campaigns, /sendWhatsAppMessage\(to, message\)/);
+  assert.doesNotMatch(campaigns, /request\.log\.\w+\([^)]*WHATSAPP_ACCESS_TOKEN/s);
+  assert.match(api, /sendCampaign/);
+  assert.match(hooks, /useSendCampaign/);
+  assert.match(page, /Enviar agora/);
 });
 
 test('payloads grandes usam paginacao e configuracao da IA nao retorna PDF base64', async () => {

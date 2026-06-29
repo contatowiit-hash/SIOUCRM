@@ -98,6 +98,15 @@ test('pedido de categoria responde diretamente com produtos daquela categoria', 
   assert.doesNotMatch(reply ?? '', /Margherita/);
 });
 
+test('pedido de produto responde com item real e preco do cardapio', () => {
+  const menu = '*Pizzas*\n- Margherita - R$ 35,00\n- Calabresa - R$ 38,00\n\n*Bebidas*\n- Refrigerante lata - R$ 6,00';
+  const reply = buildDirectMenuReply(menu, 'Quanto custa a calabresa?');
+
+  assert.match(reply ?? '', /Calabresa - R\$ 38,00/);
+  assert.doesNotMatch(reply ?? '', /Margherita/);
+  assert.doesNotMatch(reply ?? '', /arquivo|pdf/i);
+});
+
 test('upload salva texto processado e ambos WhatsApps usam a IA', async () => {
   const aiSettings = await read('server/src/routes/ai-settings.ts');
   const aiContext = await read('server/src/utils/aiContext.ts');
