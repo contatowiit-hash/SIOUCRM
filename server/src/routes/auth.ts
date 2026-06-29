@@ -4,8 +4,9 @@ import { db } from '../db/client.js';
 import { refreshSessions, restaurants, users } from '../db/schema.js';
 import { env } from '../env.js';
 import { LoginSchema, RegisterSchema } from '../schemas.js';
-import { toRestaurantDto, toUserDto } from '../utils/format.js';
 import { isDeveloperEmail, isDeveloperPassword } from '../utils/developer.js';
+import { validateEmailDomainForSignup } from '../utils/emailValidation.js';
+import { toRestaurantDto, toUserDto } from '../utils/format.js';
 import { getIp, hashPassword, randomToken, sanitizeText, sha256, slugify, verifyPassword } from '../utils/security.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/tokens.js';
 import { writeAuditLog } from '../utils/audit.js';
@@ -116,6 +117,11 @@ export const authRoutes = async (app: FastifyInstance) => {
 
     const input = parsed.data;
     const email = input.email.toLowerCase();
+    const emailDomain = await validateEmailDomainForSignup(email);
+    if (!emailDomain.valid) {
+      return reply.code(400).send({ error: 'Use um email real para criar sua conta.' });
+    }
+
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (existing && !existing.isDeleted) {
       return reply.code(409).send({ error: registerExistingAccountMessage });

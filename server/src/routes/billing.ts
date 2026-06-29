@@ -33,6 +33,17 @@ const checkoutPriceByPlan = {
   founder_lifetime: STRIPE_FOUNDER_LIFETIME_PRICE_ID,
 } as const;
 
+class CheckoutPublicError extends Error {
+  constructor(
+    public readonly publicMessage: string,
+    public readonly statusCode: number,
+    public readonly logData: Record<string, unknown> = {},
+  ) {
+    super(publicMessage);
+    this.name = 'CheckoutPublicError';
+  }
+}
+
 const trustedCheckoutOrigins = new Set([new URL(env.APP_URL).origin, 'https://www.sioucrm.com', 'https://sioucrm.com']);
 if (env.NODE_ENV !== 'production') {
   trustedCheckoutOrigins.add('http://127.0.0.1:5174');
@@ -113,17 +124,22 @@ const createCheckoutSession = async ({
   appUrl: string;
 }) => {
   if (!env.STRIPE_SECRET_KEY) {
-    throw new Error('Stripe nao configurado');
+    throw new CheckoutPublicError('Cobrança do Stripe não configurada no servidor.', 503, { reason: 'missing_stripe_secret' });
   }
 
   const mode = plan === 'lifetime' || plan === 'founder_lifetime' ? 'payment' : 'subscription';
+  const planPriceId = checkoutPriceByPlan[plan];
+  if (!planPriceId?.startsWith('price_')) {
+    throw new CheckoutPublicError('Este plano ainda não está configurado no Stripe.', 503, { reason: 'invalid_plan_price' });
+  }
+
   const body = new URLSearchParams({
     mode,
     client_reference_id: restaurantId,
     customer_email: email,
     success_url: `${appUrl}/app/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/app/planos?checkout=cancelled`,
-    'line_items[0][price]': checkoutPriceByPlan[plan],
+    'line_items[0][price]': planPriceId,
     'line_items[0][quantity]': '1',
     'metadata[restaurantId]': restaurantId,
     'metadata[restaurant_id]': restaurantId,
@@ -157,8 +173,16 @@ const createCheckoutSession = async ({
     error?: { code?: string; message?: string; param?: string; type?: string };
   };
   if (!response.ok || !data.url) {
-
-    throw new Error(data.error?.message || 'Nao foi possivel criar o checkout do Stripe');
+    const stripeCode = data.error?.code ?? data.error?.type ?? `stripe_http_${response.status}`;
+    const stripeParam = data.error?.param ?? null;
+    const resourceMissing = data.error?.code === 'resource_missing' || /No such price/i.test(data.error?.message ?? '');
+    throw new CheckoutPublicError(
+      resourceMissing
+        ? 'Este plano não foi encontrado no Stripe. Verifique os IDs dos preços no servidor.'
+        : 'Não foi possível abrir o checkout agora. Tente novamente em alguns instantes.',
+      resourceMissing ? 503 : 502,
+      { reason: 'stripe_checkout_rejected', stripeStatus: response.status, stripeCode, stripeParam },
+    );
   }
 
   return { ...data, meteredBillingEnabled };
@@ -368,12 +392,19 @@ export const billingRoutes = async (app: FastifyInstance) => {
             }
           : {}),
       });
-    } catch {
+    } catch (error) {
+      const checkoutError = error instanceof CheckoutPublicError ? error : null;
+      request.log.warn(
+        {
+          restaurantId: auth.restaurantId,
+          plan: parsed.data.plan,
+          ...(checkoutError?.logData ?? { reason: 'unexpected_checkout_error' }),
+        },
+        'Stripe checkout nao criado',
+      );
 
-      request.log.warn({ restaurantId: auth.restaurantId, plan: parsed.data.plan }, 'Stripe checkout nao criado');
-
-      return reply.code(502).send({
-        error: 'Nao foi possivel abrir o checkout agora.',
+      return reply.code(checkoutError?.statusCode ?? 502).send({
+        error: checkoutError?.publicMessage ?? 'Não foi possível abrir o checkout agora. Tente novamente em alguns instantes.',
 
       });
     }

@@ -108,8 +108,8 @@ test('Stripe checkout inclui precos de excedente nas assinaturas', async () => {
   const plans = await read('server/src/config/stripe-plans.ts');
   const billing = await read('server/src/routes/billing.ts');
 
-  assert.match(plans, /STRIPE_WHATSAPP_OVERAGE_PRICE_ID = 'price_1TfrPwJnc9f1Q8Nkui5CKasp'/);
-  assert.match(plans, /STRIPE_AI_OVERAGE_PRICE_ID = 'price_1TfrTjJnc9f1Q8Nk5W8wUltX'/);
+  assert.match(plans, /STRIPE_WHATSAPP_OVERAGE_PRICE_ID = stripePriceId\('STRIPE_WHATSAPP_OVERAGE_PRICE_ID', 'price_1TfrPwJnc9f1Q8Nkui5CKasp'\)/);
+  assert.match(plans, /STRIPE_AI_OVERAGE_PRICE_ID = stripePriceId\('STRIPE_AI_OVERAGE_PRICE_ID', 'price_1TfrTjJnc9f1Q8Nk5W8wUltX'\)/);
   assert.match(billing, /line_items\[1\]\[price\].*STRIPE_WHATSAPP_OVERAGE_PRICE_ID/s);
   assert.match(billing, /line_items\[2\]\[price\].*STRIPE_AI_OVERAGE_PRICE_ID/s);
   assert.match(billing, /if \(mode === 'subscription'\).*addSubscriptionOveragePrices\(body\)/s);
@@ -118,6 +118,7 @@ test('Stripe checkout inclui precos de excedente nas assinaturas', async () => {
 
 test('Stripe checkout usa dominio confiavel da requisicao para voltar ao site', async () => {
   const billing = await read('server/src/routes/billing.ts');
+  const plans = await read('server/src/config/stripe-plans.ts');
 
   assert.match(billing, /trustedCheckoutOrigins/);
   assert.match(billing, /https:\/\/www\.sioucrm\.com/);
@@ -125,6 +126,11 @@ test('Stripe checkout usa dominio confiavel da requisicao para voltar ao site', 
   assert.match(billing, /success_url: `\$\{appUrl\}\/app\/planos\?checkout=success/);
   assert.match(billing, /cancel_url: `\$\{appUrl\}\/app\/planos\?checkout=cancelled`/);
   assert.doesNotMatch(billing, /success_url: `\$\{env\.APP_URL\}\/app\/planos/);
+  assert.match(plans, /process\.env\[key\]\?\.trim\(\) \|\| fallback/);
+  assert.match(billing, /CheckoutPublicError/);
+  assert.match(billing, /missing_stripe_secret/);
+  assert.match(billing, /resource_missing/);
+  assert.doesNotMatch(billing, /request\.log\.(?:warn|error|info)\([^)]*data\.error\?\.message/s);
 });
 
 test('headers de seguranca fortes e cache privado estao configurados', async () => {
@@ -306,6 +312,8 @@ test('cadastro entra direto, cria sessao segura e leva para planos', async () =>
   const layout = await read('src/components/layout/DashboardLayout.tsx');
 
   assert.match(auth, /emailVerifiedAt:\s*new Date\(\)/);
+  assert.match(auth, /validateEmailDomainForSignup\(email\)/);
+  assert.match(auth, /Use um email real para criar sua conta/);
   assert.match(auth, /reply\.setCookie\(refreshCookieName, tokens\.refreshToken, refreshCookieOptions\(request\)\)/);
   assert.match(auth, /access_token:\s*tokens\.accessToken/);
   assert.match(auth, /requires_email_verification:\s*false/);
@@ -319,6 +327,18 @@ test('cadastro entra direto, cria sessao segura e leva para planos', async () =>
   assert.match(app, /RequirePaidPlan/);
   assert.match(app, /paidPlans\.has\(restaurant\?\.plan \|\| 'free'\)/);
   assert.match(layout, /planLocked/);
+});
+
+test('cadastro bloqueia dominio de email sem DNS de email', async () => {
+  const validator = await read('server/src/utils/emailValidation.ts');
+
+  assert.match(validator, /resolveMx/);
+  assert.match(validator, /resolveMxWithTimeout/);
+  assert.match(validator, /emailDomainValidationTimeoutMs/);
+  assert.match(validator, /blockedEmailDomains/);
+  assert.match(validator, /domainCache/);
+  assert.match(validator, /invalid_domain/);
+  assert.doesNotMatch(validator, /console\.log|request\.log/);
 });
 
 test('RBAC protege cobranca, IA, automacoes e configuracao do WhatsApp', async () => {
