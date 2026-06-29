@@ -66,7 +66,7 @@ export const buildApp = async () => {
 
   await app.register(cors, {
     origin: (origin, callback) => {
-      const allowed = new Set([env.APP_URL, ...productionOrigins]);
+      const allowed = new Set([env.APP_URL, env.FRONTEND_URL, ...productionOrigins]);
       if (env.NODE_ENV !== 'production') {
         allowed.add('http://127.0.0.1:5174');
         allowed.add('http://localhost:5174');

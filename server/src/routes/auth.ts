@@ -26,7 +26,7 @@ const isHttpsRequest = (request: FastifyRequest) => {
 const refreshCookieOptions = (request: FastifyRequest) => ({
   path: '/',
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
   secure: env.NODE_ENV === 'production' || isHttpsRequest(request),
   priority: 'high' as const,
   maxAge: refreshSessionTtlSeconds,
@@ -44,6 +44,7 @@ const clearRefreshCookie = (request: FastifyRequest, reply: FastifyReply) => {
 };
 
 const trustedBrowserOrigins = new Set([new URL(env.APP_URL).origin]);
+trustedBrowserOrigins.add(new URL(env.FRONTEND_URL).origin);
 trustedBrowserOrigins.add('https://www.sioucrm.com');
 trustedBrowserOrigins.add('https://sioucrm.com');
 if (env.NODE_ENV !== 'production') {

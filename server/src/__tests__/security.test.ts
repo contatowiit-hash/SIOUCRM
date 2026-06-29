@@ -289,15 +289,18 @@ test('frontend nao contem cliente Supabase nem persiste access token', async () 
 
 test('cookie de renovacao usa politica segura e consistente', async () => {
   const auth = await read('server/src/routes/auth.ts');
+  const app = await read('server/src/app.ts');
   const api = await read('src/lib/api.ts');
   const tokens = await read('server/src/utils/tokens.ts');
 
   assert.match(auth, /httpOnly:\s*true/);
-  assert.match(auth, /sameSite:\s*'lax'/);
+  assert.match(auth, /sameSite:\s*env\.NODE_ENV === 'production' \? \('none' as const\) : \('lax' as const\)/);
   assert.match(auth, /secure:\s*env\.NODE_ENV === 'production' \|\| isHttpsRequest\(request\)/);
   assert.match(auth, /priority:\s*'high'/);
   assert.match(auth, /const refreshSessionTtlDays = 30/);
   assert.match(auth, /maxAge:\s*refreshSessionTtlSeconds/);
+  assert.match(auth, /trustedBrowserOrigins\.add\(new URL\(env\.FRONTEND_URL\)\.origin\)/);
+  assert.match(app, /new Set\(\[env\.APP_URL, env\.FRONTEND_URL, \.\.\.productionOrigins\]\)/);
   assert.match(auth, /reply\.setCookie\(refreshCookieName, tokens\.refreshToken, refreshCookieOptions\(request\)\)/);
   assert.match(auth, /const clearRefreshCookie = \(request: FastifyRequest, reply: FastifyReply\)/);
   assert.doesNotMatch(auth, /clearCookie\(refreshCookieName,\s*\{\s*path:\s*'\/'\s*\}\)/s);
