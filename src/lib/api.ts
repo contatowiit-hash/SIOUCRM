@@ -14,10 +14,7 @@ const normalizeApiBaseUrl = () => {
   const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
   if (configuredApiUrl) return configuredApiUrl.replace(/\/+$/, '');
 
-  const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim();
-  if (configuredBackendUrl) return `${configuredBackendUrl.replace(/\/+$/, '')}/api`;
-
-  return import.meta.env.PROD ? '/api' : 'http://127.0.0.1:3334/api';
+  return 'http://127.0.0.1:3334/api';
 };
 
 export const apiBaseUrl = normalizeApiBaseUrl();

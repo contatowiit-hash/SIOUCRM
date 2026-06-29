@@ -149,7 +149,8 @@ test('headers de seguranca fortes e cache privado estao configurados', async () 
   assert.match(staticServer, /Content-Security-Policy/);
   assert.match(vercel, /Cross-Origin-Opener-Policy/);
   assert.match(vercel, /Strict-Transport-Security/);
-  assert.match(vercel, /connect-src 'self' https:\/\/\*\.onrender\.com/);
+  assert.match(vercel, /connect-src 'self';/);
+  assert.doesNotMatch(vercel, /connect-src[^;]*onrender/);
 });
 
 test('frontend de producao usa proxy same-origin para preservar cookies', async () => {
@@ -157,10 +158,9 @@ test('frontend de producao usa proxy same-origin para preservar cookies', async 
   const readme = await read('server/README.md');
 
   assert.match(api, /if \(import\.meta\.env\.PROD\) return '\/api'/);
-  assert.match(api, /VITE_BACKEND_URL/);
-  assert.match(api, /configuredBackendUrl\.replace/);
-  assert.match(api, /\/api`/);
-  assert.match(readme, /VITE_BACKEND_URL=https:\/\/sua-api-na-render\.onrender\.com/);
+  assert.doesNotMatch(api, /VITE_BACKEND_URL/);
+  assert.doesNotMatch(api, /configuredBackendUrl/);
+  assert.match(readme, /Nao configure `VITE_BACKEND_URL` em producao/);
 });
 
 test('deploy da Vercel encaminha webhooks e limita conexoes serverless', async () => {

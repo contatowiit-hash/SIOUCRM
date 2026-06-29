@@ -8,7 +8,6 @@ Crie um `.env.local` ou `.env` na raiz do projeto com:
 
 ```env
 VITE_API_URL=http://127.0.0.1:3333/api
-VITE_BACKEND_URL=https://sua-api-na-render.onrender.com
 NODE_ENV=development
 API_HOST=127.0.0.1
 API_PORT=3333
@@ -39,8 +38,8 @@ fallback, mas pode falhar em hospedagens que bloqueiam conexoes SMTP de saida.
 Na Vercel, configure `BACKEND_URL` apontando para a URL pública da Render. Assim o site continua
 chamando `/api` no próprio domínio e a Vercel encaminha a requisição para o backend real.
 
-Opcionalmente, `VITE_BACKEND_URL` ou `VITE_API_URL` podem apontar o frontend direto para a Render,
-mas o proxy por `BACKEND_URL` é preferível para manter os cookies no domínio do site.
+Nao configure `VITE_BACKEND_URL` em producao. O frontend publicado deve chamar `/api` no proprio
+dominio para manter o cookie de login no site.
 
 ## Rodar banco
 
