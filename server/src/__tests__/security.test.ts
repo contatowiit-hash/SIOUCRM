@@ -152,10 +152,11 @@ test('headers de seguranca fortes e cache privado estao configurados', async () 
   assert.match(vercel, /connect-src 'self' https:\/\/\*\.onrender\.com/);
 });
 
-test('frontend pode apontar para backend hospedado na Render', async () => {
+test('frontend de producao usa proxy same-origin para preservar cookies', async () => {
   const api = await read('src/lib/api.ts');
   const readme = await read('server/README.md');
 
+  assert.match(api, /if \(import\.meta\.env\.PROD\) return '\/api'/);
   assert.match(api, /VITE_BACKEND_URL/);
   assert.match(api, /configuredBackendUrl\.replace/);
   assert.match(api, /\/api`/);
@@ -299,6 +300,9 @@ test('cookie de renovacao usa politica segura e consistente', async () => {
   assert.match(auth, /priority:\s*'high'/);
   assert.match(auth, /const refreshSessionTtlDays = 30/);
   assert.match(auth, /maxAge:\s*refreshSessionTtlSeconds/);
+  assert.match(auth, /const refreshCookieDomain = \(request: FastifyRequest\)/);
+  assert.match(auth, /hostname === 'sioucrm\.com' \|\| hostname\?\.endsWith\('\.sioucrm\.com'\) \? '\.sioucrm\.com' : undefined/);
+  assert.match(auth, /\.\.\.\(domain \? \{ domain \} : \{\}\)/);
   assert.match(auth, /trustedBrowserOrigins\.add\(new URL\(env\.FRONTEND_URL\)\.origin\)/);
   assert.match(app, /new Set\(\[env\.APP_URL, env\.FRONTEND_URL, \.\.\.productionOrigins\]\)/);
   assert.match(auth, /reply\.setCookie\(refreshCookieName, tokens\.refreshToken, refreshCookieOptions\(request\)\)/);

@@ -23,19 +23,30 @@ const isHttpsRequest = (request: FastifyRequest) => {
   return protocol === 'https';
 };
 
-const refreshCookieOptions = (request: FastifyRequest) => ({
-  path: '/',
-  httpOnly: true,
-  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
-  secure: env.NODE_ENV === 'production' || isHttpsRequest(request),
-  priority: 'high' as const,
-  maxAge: refreshSessionTtlSeconds,
-});
+const refreshCookieDomain = (request: FastifyRequest) => {
+  const host = firstHeaderValue(request.headers['x-forwarded-host']) ?? firstHeaderValue(request.headers.host);
+  const hostname = host?.toLowerCase().split(':')[0];
+  return hostname === 'sioucrm.com' || hostname?.endsWith('.sioucrm.com') ? '.sioucrm.com' : undefined;
+};
+
+const refreshCookieOptions = (request: FastifyRequest) => {
+  const domain = refreshCookieDomain(request);
+  return {
+    path: '/',
+    ...(domain ? { domain } : {}),
+    httpOnly: true,
+    sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
+    secure: env.NODE_ENV === 'production' || isHttpsRequest(request),
+    priority: 'high' as const,
+    maxAge: refreshSessionTtlSeconds,
+  };
+};
 
 const clearRefreshCookie = (request: FastifyRequest, reply: FastifyReply) => {
   const options = refreshCookieOptions(request);
   return reply.clearCookie(refreshCookieName, {
     path: options.path,
+    domain: options.domain,
     httpOnly: options.httpOnly,
     sameSite: options.sameSite,
     secure: options.secure,

@@ -9,6 +9,8 @@ import type {
 } from '../types/domain';
 
 const normalizeApiBaseUrl = () => {
+  if (import.meta.env.PROD) return '/api';
+
   const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
   if (configuredApiUrl) return configuredApiUrl.replace(/\/+$/, '');
 
