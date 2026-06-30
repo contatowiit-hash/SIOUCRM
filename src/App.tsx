@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { LoadingScreen } from './components/ui/LoadingScreen';
 import { useDemoMode } from './hooks/useDemoMode';
 import { useAuth } from './providers/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
@@ -22,6 +23,15 @@ import { BillingPage } from './pages/BillingPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 const paidPlans = new Set(['plus', 'starter', 'pro', 'premium', 'lifetime', 'founder_lifetime']);
+
+const PublicRoute = ({ children }: { children: ReactNode }) => {
+  const { session, loading } = useAuth();
+
+  if (loading) return <LoadingScreen />;
+  if (session) return <Navigate to="/app/planos" replace />;
+
+  return <>{children}</>;
+};
 
 const RequirePaidPlan = ({ children }: { children: ReactNode }) => {
   const demoMode = useDemoMode();
@@ -53,11 +63,11 @@ const privateRoutes = (
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/cadastro" element={<RegisterPage />} />
-      <Route path="/recuperar-senha" element={<ResetPasswordPage />} />
-      <Route path="/verificar-email" element={<VerifyEmailPage />} />
+      <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/cadastro" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+      <Route path="/recuperar-senha" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+      <Route path="/verificar-email" element={<PublicRoute><VerifyEmailPage /></PublicRoute>} />
       <Route path="/dashboard" element={<Navigate to="/app/planos" replace />} />
       <Route
         path="/app"

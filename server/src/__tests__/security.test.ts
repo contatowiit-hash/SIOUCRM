@@ -342,6 +342,10 @@ test('cadastro entra direto, cria sessao segura e leva para planos', async () =>
   assert.match(api, /setAccessToken\(result\.access_token\)/);
   assert.match(authPages, /startApiSession\(result\)/);
   assert.match(authPages, /navigate\('\/app\/planos'/);
+  assert.match(app, /const PublicRoute = \(\{ children \}: \{ children: ReactNode \}\) => \{/);
+  assert.match(app, /if \(loading\) return <LoadingScreen \/>;/);
+  assert.match(app, /if \(session\) return <Navigate to="\/app\/planos" replace \/>;/);
+  assert.match(app, /path="\/login" element=\{<PublicRoute><LoginPage \/><\/PublicRoute>\}/);
   assert.doesNotMatch(protectedRoute, /email_confirmed_at/);
   assert.match(app, /RequirePaidPlan/);
   assert.match(app, /paidPlans\.has\(restaurant\?\.plan \|\| 'free'\)/);
