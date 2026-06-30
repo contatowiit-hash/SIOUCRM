@@ -23,9 +23,18 @@ const isHttpsRequest = (request: FastifyRequest) => {
   return protocol === 'https';
 };
 
+const hostnameFromOrigin = (origin: string | undefined) => {
+  if (!origin) return undefined;
+  try {
+    return new URL(origin).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+};
+
 const refreshCookieDomain = (request: FastifyRequest) => {
   const host = firstHeaderValue(request.headers['x-forwarded-host']) ?? firstHeaderValue(request.headers.host);
-  const hostname = host?.toLowerCase().split(':')[0];
+  const hostname = hostnameFromOrigin(firstHeaderValue(request.headers.origin)) ?? host?.toLowerCase().split(':')[0];
   return hostname === 'sioucrm.com' || hostname?.endsWith('.sioucrm.com') ? '.sioucrm.com' : undefined;
 };
 
@@ -92,6 +101,14 @@ const requireTrustedBrowserOrigin: preHandlerHookHandler = async (request: Fasti
 const registerExistingAccountMessage =
   'Esse email ja tem uma conta. Entre no painel ou use recuperar senha.';
 
+const issueAccessToken = (user: typeof users.$inferSelect) =>
+  signAccessToken({
+    sub: user.id,
+    restaurantId: user.restaurantId,
+    role: user.role,
+    email: user.email,
+  });
+
 const issueTokens = async ({
   user,
   request,
@@ -99,12 +116,7 @@ const issueTokens = async ({
   user: typeof users.$inferSelect;
   request: FastifyRequest;
 }) => {
-  const accessToken = await signAccessToken({
-    sub: user.id,
-    restaurantId: user.restaurantId,
-    role: user.role,
-    email: user.email,
-  });
+  const accessToken = await issueAccessToken(user);
   const rawRefresh = randomToken();
   const expiresAt = new Date(Date.now() + refreshSessionTtlMs);
   const [session] = await db
@@ -301,34 +313,6 @@ export const authRoutes = async (app: FastifyInstance) => {
       .limit(1);
 
     if (!session) {
-      const [staleSession] = await db
-        .select()
-        .from(refreshSessions)
-        .where(
-          and(
-            eq(refreshSessions.id, verified.sessionId),
-            eq(refreshSessions.userId, verified.userId),
-            eq(refreshSessions.tokenHash, tokenHash),
-          ),
-        )
-        .limit(1);
-
-      if (staleSession) {
-        await db
-          .update(refreshSessions)
-          .set({ revokedAt: new Date() })
-          .where(eq(refreshSessions.userId, verified.userId));
-
-        await writeAuditLog({
-          request,
-          restaurantId: staleSession.restaurantId,
-          userId: verified.userId,
-          action: 'auth_refresh_reuse_detected',
-          resourceType: 'refresh_session',
-          resourceId: staleSession.id,
-        }).catch((error) => request.log.error({ error }, 'refresh reuse audit failed'));
-      }
-
       clearRefreshCookie(request, reply);
       return reply.code(401).send({ error: 'Unauthorized' });
     }
@@ -341,12 +325,15 @@ export const authRoutes = async (app: FastifyInstance) => {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.id, user.restaurantId)).limit(1);
-    await db.update(refreshSessions).set({ revokedAt: new Date() }).where(eq(refreshSessions.id, session.id));
-    const tokens = await issueTokens({ user, request });
-    reply.setCookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions(request));
+    await db
+      .update(refreshSessions)
+      .set({ expiresAt: new Date(Date.now() + refreshSessionTtlMs) })
+      .where(eq(refreshSessions.id, session.id));
+    const accessToken = await issueAccessToken(user);
+    reply.setCookie(refreshCookieName, cookie, refreshCookieOptions(request));
 
     return reply.send({
-      access_token: tokens.accessToken,
+      access_token: accessToken,
       user: toUserDto(user),
       restaurant: toRestaurantDto(restaurant, { developer: isDeveloperEmail(user.email) }),
     });

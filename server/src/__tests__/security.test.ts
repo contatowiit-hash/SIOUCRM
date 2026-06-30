@@ -300,7 +300,9 @@ test('cookie de renovacao usa politica segura e consistente', async () => {
   assert.match(auth, /priority:\s*'high'/);
   assert.match(auth, /const refreshSessionTtlDays = 30/);
   assert.match(auth, /maxAge:\s*refreshSessionTtlSeconds/);
+  assert.match(auth, /const hostnameFromOrigin = \(origin: string \| undefined\)/);
   assert.match(auth, /const refreshCookieDomain = \(request: FastifyRequest\)/);
+  assert.match(auth, /hostnameFromOrigin\(firstHeaderValue\(request\.headers\.origin\)\)/);
   assert.match(auth, /hostname === 'sioucrm\.com' \|\| hostname\?\.endsWith\('\.sioucrm\.com'\) \? '\.sioucrm\.com' : undefined/);
   assert.match(auth, /\.\.\.\(domain \? \{ domain \} : \{\}\)/);
   assert.match(auth, /trustedBrowserOrigins\.add\(new URL\(env\.FRONTEND_URL\)\.origin\)/);
@@ -312,6 +314,12 @@ test('cookie de renovacao usa politica segura e consistente', async () => {
   assert.match(api, /credentials:\s*'include'/);
   assert.doesNotMatch(api, /localStorage\.setItem\([^)]*access_token/s);
   assert.match(api, /async refresh\(\)\s*\{\s*return refreshAccessToken\(\);\s*\}/s);
+  assert.match(auth, /\.set\(\{ expiresAt: new Date\(Date\.now\(\) \+ refreshSessionTtlMs\) \}\)\s*\.where\(eq\(refreshSessions\.id, session\.id\)\)/s);
+  assert.match(auth, /const accessToken = await issueAccessToken\(user\)/);
+  assert.match(auth, /reply\.setCookie\(refreshCookieName, cookie, refreshCookieOptions\(request\)\)/);
+  assert.doesNotMatch(auth, /auth_refresh_reuse_detected/);
+  assert.doesNotMatch(auth, /\.where\(eq\(refreshSessions\.userId, verified\.userId\)\)/);
+  assert.match(api, /const apiFetch = async <T>\(path: string, init: RequestInit = \{\}\): Promise<T> => \{[\s\S]*await refreshAccessToken\(\);[\s\S]*return await apiFetchOnce<T>\(path, init\);/);
 });
 
 test('cadastro entra direto, cria sessao segura e leva para planos', async () => {
