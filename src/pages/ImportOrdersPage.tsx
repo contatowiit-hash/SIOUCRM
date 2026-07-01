@@ -162,7 +162,7 @@ export const ImportOrdersPage = () => {
             <input {...getInputProps()} />
             <UploadCloud className="h-12 w-12 text-neon" />
             <h2 className="mt-4 text-2xl font-black text-white">Solte sua planilha aqui</h2>
-            <p className="mt-2 max-w-xl text-sm text-slate-400">Use uma planilha .xlsx ou .csv com nome, telefone, data, produto, quantidade e valores.</p>
+            <p className="mt-2 max-w-xl text-sm text-slate-400">Use uma planilha .xlsx ou .csv. Nome, telefone e produto são suficientes; o que faltar fica em branco.</p>
             {file ? (
               <p className="mt-4 rounded-full border border-neon/30 bg-neon/10 px-4 py-2 text-sm font-bold text-sky-100">{file.name}</p>
             ) : null}

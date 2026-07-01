@@ -80,6 +80,8 @@ const rowCellValues = (row: ExcelJS.Row) => {
   return row.values.slice(1) as ExcelJS.CellValue[];
 };
 
+const getMappedValue = (values: unknown[], index: number) => (index >= 0 ? values[index] : '');
+
 const parseMoney = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const raw = String(value ?? '').trim();
@@ -157,12 +159,6 @@ export const parseSpreadsheet = async (buffer: Buffer, filename: string): Promis
     (Object.keys(headerAliases) as Array<keyof RawOrderRow>).map((field) => [field, findField(headers, field)]),
   ) as Record<keyof RawOrderRow, number>;
 
-  const required: Array<keyof RawOrderRow> = ['customerName', 'customerPhone', 'orderedAt', 'product', 'quantity', 'unitPrice', 'totalPrice'];
-  const missing = required.filter((field) => fieldIndexes[field] < 0);
-  if (missing.length) {
-    throw new Error('A planilha nao tem todas as colunas obrigatorias. Baixe o modelo e compare os titulos.');
-  }
-
   const valid: ParsedOrder[] = [];
   const invalid: ParseResult['invalid'] = [];
   const duplicates: ParseResult['duplicates'] = [];
@@ -172,17 +168,17 @@ export const parseSpreadsheet = async (buffer: Buffer, filename: string): Promis
     if (rowNumber === 1) return;
     const values = rowCellValues(row).map((value) => cellValue(value as ExcelJS.CellValue));
     const raw: RawOrderRow = {
-      customerName: String(values[fieldIndexes.customerName] ?? ''),
-      customerPhone: String(values[fieldIndexes.customerPhone] ?? ''),
-      orderedAt: values[fieldIndexes.orderedAt],
-      product: String(values[fieldIndexes.product] ?? ''),
-      category: fieldIndexes.category >= 0 ? String(values[fieldIndexes.category] ?? '') : '',
-      quantity: values[fieldIndexes.quantity],
-      unitPrice: values[fieldIndexes.unitPrice],
-      totalPrice: values[fieldIndexes.totalPrice],
-      paymentMethod: fieldIndexes.paymentMethod >= 0 ? String(values[fieldIndexes.paymentMethod] ?? '') : '',
-      status: fieldIndexes.status >= 0 ? String(values[fieldIndexes.status] ?? '') : '',
-      notes: fieldIndexes.notes >= 0 ? String(values[fieldIndexes.notes] ?? '') : '',
+      customerName: String(getMappedValue(values, fieldIndexes.customerName) ?? ''),
+      customerPhone: String(getMappedValue(values, fieldIndexes.customerPhone) ?? ''),
+      orderedAt: getMappedValue(values, fieldIndexes.orderedAt),
+      product: String(getMappedValue(values, fieldIndexes.product) ?? ''),
+      category: String(getMappedValue(values, fieldIndexes.category) ?? ''),
+      quantity: getMappedValue(values, fieldIndexes.quantity),
+      unitPrice: getMappedValue(values, fieldIndexes.unitPrice),
+      totalPrice: getMappedValue(values, fieldIndexes.totalPrice),
+      paymentMethod: String(getMappedValue(values, fieldIndexes.paymentMethod) ?? ''),
+      status: String(getMappedValue(values, fieldIndexes.status) ?? ''),
+      notes: String(getMappedValue(values, fieldIndexes.notes) ?? ''),
     };
 
     const isEmpty = Object.values(raw).every((value) => String(value ?? '').trim() === '');
@@ -193,17 +189,18 @@ export const parseSpreadsheet = async (buffer: Buffer, filename: string): Promis
     const customerPhone = sanitizePhone(raw.customerPhone);
     const orderedAt = parseDate(raw.orderedAt);
     const product = sanitizeText(raw.product, 120);
-    const quantity = parseQuantity(raw.quantity);
-    const unitPrice = parseMoney(raw.unitPrice);
-    const totalPrice = parseMoney(raw.totalPrice);
+    const quantity = parseQuantity(raw.quantity) ?? 1;
+    const unitPriceFromSheet = parseMoney(raw.unitPrice);
+    const totalPriceFromSheet = parseMoney(raw.totalPrice);
+    const unitPrice = unitPriceFromSheet ?? (totalPriceFromSheet !== null ? totalPriceFromSheet / quantity : 0);
+    const totalPrice = totalPriceFromSheet ?? unitPrice * quantity;
 
     if (!customerName) errors.push('nome do cliente vazio');
     if (!customerPhone || customerPhone.replace(/\D/g, '').length < 10) errors.push('telefone invalido');
-    if (!orderedAt) errors.push('data do pedido invalida');
     if (!product) errors.push('produto vazio');
-    if (!quantity || quantity <= 0) errors.push('quantidade invalida');
-    if (unitPrice === null || unitPrice < 0) errors.push('valor unitario invalido');
-    if (totalPrice === null || totalPrice < 0) errors.push('valor total invalido');
+    if (quantity <= 0) errors.push('quantidade invalida');
+    if (unitPrice < 0) errors.push('valor unitario invalido');
+    if (totalPrice < 0) errors.push('valor total invalido');
 
     if (errors.length) {
       invalid.push({ row: rowNumber, reason: errors.join('; '), data: raw });
@@ -213,12 +210,12 @@ export const parseSpreadsheet = async (buffer: Buffer, filename: string): Promis
     const parsedWithoutHash = {
       customerName,
       customerPhone,
-      orderedAt: orderedAt!,
+      orderedAt: orderedAt ?? new Date(),
       product,
       category: sanitizeText(raw.category || '', 80) || null,
-      quantity: quantity!,
-      unitPrice: unitPrice!,
-      totalPrice: totalPrice!,
+      quantity,
+      unitPrice,
+      totalPrice,
       paymentMethod: sanitizeText(raw.paymentMethod || '', 60) || null,
       status: sanitizeText(raw.status || '', 40) || null,
       notes: sanitizeMultilineText(raw.notes || '', 1000) || null,

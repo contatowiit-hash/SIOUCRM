@@ -45,6 +45,25 @@ test('parser de pedidos aceita modelo humano e separa validos, invalidos e dupli
   assert.ok(result.valid[0].rowHash.length >= 32);
 });
 
+test('parser de pedidos aceita planilha incompleta sem bloquear tudo', async () => {
+  const { parseSpreadsheet } = await import('../services/spreadsheetParser.js');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Pedidos');
+  sheet.addRow(['Cliente', 'WhatsApp', 'Produto']);
+  sheet.addRow(['Bruno', '11988887777', 'Combo burger']);
+  sheet.addRow(['Sem produto', '11977776666', '']);
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+  const result = await parseSpreadsheet(buffer, 'pedidos.xlsx');
+
+  assert.equal(result.valid.length, 1);
+  assert.equal(result.invalid.length, 1);
+  assert.equal(result.valid[0].quantity, 1);
+  assert.equal(result.valid[0].unitPrice, 0);
+  assert.equal(result.valid[0].totalPrice, 0);
+  assert.ok(result.valid[0].orderedAt instanceof Date);
+});
+
 test('importacao de pedidos usa tabelas existentes, seguranca e UI do CRM', async () => {
   const schema = await read('server/src/db/schema.ts');
   const migration = await read('server/migrations/0018_import_orders.sql');
