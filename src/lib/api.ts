@@ -337,6 +337,14 @@ export const api = {
     setAccessToken(result.access_token);
     return result;
   },
+  async googleLogin(input: { credential: string }) {
+    const result = await apiFetch<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    setAccessToken(result.access_token);
+    return result;
+  },
   async resendVerification(input: { email: string }) {
     return apiFetch<{ message: string }>('/auth/resend-verification', {
       method: 'POST',

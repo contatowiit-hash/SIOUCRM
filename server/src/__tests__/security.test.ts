@@ -275,6 +275,7 @@ test('segredos com prefixo VITE sao recusados', async () => {
   assert.match(envSource, /forbiddenFrontendSecretKeys/);
   assert.match(envSource, /VITE_WHATSAPP_ACCESS_TOKEN/);
   assert.match(envSource, /VITE_STRIPE_SECRET_KEY/);
+  assert.match(envSource, /VITE_GOOGLE_CLIENT_SECRET/);
 });
 
 test('frontend nao contem cliente Supabase nem persiste access token', async () => {
@@ -366,6 +367,28 @@ test('cadastro bloqueia dominio de email sem DNS de email', async () => {
   assert.doesNotMatch(validator, /console\.log|request\.log/);
 });
 
+
+test('login com Google valida token no backend e preserva onboarding do restaurante', async () => {
+  const auth = await read('server/src/routes/auth.ts');
+  const schema = await read('server/src/db/schema.ts');
+  const migration = await read('server/migrations/0019_google_oauth.sql');
+  const api = await read('src/lib/api.ts');
+  const main = await read('src/main.tsx');
+  const authPages = await read('src/pages/AuthPages.tsx');
+
+  assert.match(schema, /googleId: text\('google_id'\)/);
+  assert.match(migration, /alter table users add column if not exists google_id text/);
+  assert.match(auth, /OAuth2Client/);
+  assert.match(auth, /verifyIdToken/);
+  assert.match(auth, /audience: env\.GOOGLE_CLIENT_ID/);
+  assert.match(auth, /payload\?\.email_verified !== true/);
+  assert.match(auth, /Crie sua conta primeiro/);
+  const googleRoute = auth.slice(auth.indexOf("/auth/google"), auth.indexOf("/auth/verify-email"));
+  assert.doesNotMatch(googleRoute, /credential\s*:/);
+  assert.match(api, /googleLogin\(input: \{ credential: string \}\)/);
+  assert.match(main, /GoogleOAuthProvider/);
+  assert.match(authPages, /<GoogleLogin/);
+});
 test('RBAC protege cobranca, IA, automacoes e configuracao do WhatsApp', async () => {
   const billing = await read('server/src/routes/billing.ts');
   const aiSettings = await read('server/src/routes/ai-settings.ts');

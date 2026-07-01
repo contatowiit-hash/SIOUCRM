@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import { z } from 'zod';
 
 const optionalUrl = z.preprocess((value) => (value === '' ? undefined : value), z.string().url().optional());
@@ -30,6 +30,8 @@ const EnvSchema = z.object({
   META_APP_SECRET: optionalSecret,
   GROQ_API_KEY: optionalSecret,
   GROQ_MODEL: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional()),
+  GOOGLE_CLIENT_ID: optionalString,
+  GOOGLE_CLIENT_SECRET: optionalSecret,
   EVOLUTION_API_URL: optionalUrl,
   EVOLUTION_API_KEY: optionalSecret,
   INTEGRATION_ENCRYPTION_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().min(32).optional()),
@@ -77,6 +79,7 @@ const EnvSchema = z.object({
 const forbiddenFrontendSecretKeys = [
   'VITE_API_GROQ',
   'VITE_GROQ_API_KEY',
+  'VITE_GOOGLE_CLIENT_SECRET',
   'VITE_STRIPE_SECRET_KEY',
   'VITE_STRIPE_WEBHOOK_SECRET',
   'VITE_WHATSAPP_ACCESS_TOKEN',

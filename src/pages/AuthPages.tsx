@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import {
   ArrowLeft,
   Eye,
@@ -38,6 +39,7 @@ const authTabs: Array<{ label: string; to: string; mode: AuthTabMode }> = [
 
 const PENDING_CHECKOUT_KEY = 'pendingCheckout';
 const REDIRECT_AFTER_LOGIN_KEY = 'redirectAfterLogin';
+const googleLoginEnabled = Boolean((import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim());
 
 const AuthTabs = ({ active }: { active: AuthMode }) => (
   <div className="grid grid-cols-3 rounded-2xl border border-white/15 bg-white/[0.035] p-1">
@@ -173,18 +175,38 @@ export const LoginPage = () => {
     return from?.pathname ? `${from.pathname}${from.search || ''}` : '/app/planos';
   })();
 
+  const finishLogin = (auth: Awaited<ReturnType<typeof api.login>>) => {
+    startApiSession(auth);
+    localStorage.removeItem(PENDING_CHECKOUT_KEY);
+    localStorage.removeItem(REDIRECT_AFTER_LOGIN_KEY);
+    navigate(redirectTo, { replace: true });
+  };
+
   const onSubmit = async (values: LoginInput) => {
     setMessage(null);
     try {
-      const auth = await api.login(values);
-      startApiSession(auth);
-      localStorage.removeItem(PENDING_CHECKOUT_KEY);
-      localStorage.removeItem(REDIRECT_AFTER_LOGIN_KEY);
-      navigate(redirectTo, { replace: true });
+      finishLogin(await api.login(values));
     } catch (error) {
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'Nao foi possivel entrar. Tente novamente.',
+      });
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    setMessage(null);
+    if (!credentialResponse.credential) {
+      setMessage({ type: 'error', text: 'Nao foi possivel confirmar sua conta Google.' });
+      return;
+    }
+
+    try {
+      finishLogin(await api.googleLogin({ credential: credentialResponse.credential }));
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Nao foi possivel entrar com Google.',
       });
     }
   };
@@ -252,6 +274,25 @@ export const LoginPage = () => {
         >
           Entrar no painel
         </Button>
+        {googleLoginEnabled ? (
+          <>
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-muted">
+              <span className="h-px flex-1 bg-white/10" />
+              ou
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+            <div className="overflow-hidden rounded-2xl bg-white p-1">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setMessage({ type: 'error', text: 'Nao foi possivel entrar com Google.' })}
+                text="signin_with"
+                shape="rectangular"
+                size="large"
+                width="100%"
+              />
+            </div>
+          </>
+        ) : null}
         <p className="text-center text-xs text-muted">Login real usa o backend seguro conectado ao Neon.</p>
       </form>
     </AuthShell>

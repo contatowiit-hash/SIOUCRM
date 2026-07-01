@@ -85,6 +85,7 @@ export const users = pgTable(
       .references(() => restaurants.id, { onDelete: 'cascade' }),
     fullName: text('full_name').notNull(),
     email: text('email').notNull(),
+    googleId: text('google_id'),
     passwordHash: text('password_hash').notNull(),
     role: roleEnum('role').notNull().default('owner'),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
@@ -95,6 +96,7 @@ export const users = pgTable(
   },
   (table) => ({
     emailIdx: uniqueIndex('users_email_idx').on(table.email),
+    googleIdIdx: uniqueIndex('users_google_id_idx').on(table.googleId),
     restaurantIdx: index('users_restaurant_id_idx').on(table.restaurantId),
   }),
 );

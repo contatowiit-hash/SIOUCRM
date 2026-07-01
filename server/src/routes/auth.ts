@@ -1,9 +1,10 @@
-﻿import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
+import { OAuth2Client } from 'google-auth-library';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { refreshSessions, restaurants, users } from '../db/schema.js';
 import { env } from '../env.js';
-import { LoginSchema, RegisterSchema } from '../schemas.js';
+import { GoogleAuthSchema, LoginSchema, RegisterSchema } from '../schemas.js';
 import { isDeveloperEmail, isDeveloperPassword } from '../utils/developer.js';
 import { validateEmailDomainForSignup } from '../utils/emailValidation.js';
 import { toRestaurantDto, toUserDto } from '../utils/format.js';
@@ -100,6 +101,7 @@ const requireTrustedBrowserOrigin: preHandlerHookHandler = async (request: Fasti
 
 const registerExistingAccountMessage =
   'Esse email ja tem uma conta. Entre no painel ou use recuperar senha.';
+const googleClient = env.GOOGLE_CLIENT_ID ? new OAuth2Client(env.GOOGLE_CLIENT_ID) : null;
 
 const issueAccessToken = (user: typeof users.$inferSelect) =>
   signAccessToken({
@@ -201,6 +203,94 @@ export const authRoutes = async (app: FastifyInstance) => {
     });
   });
 
+  app.post('/auth/google', { preHandler: requireTrustedBrowserOrigin, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (!googleClient || !env.GOOGLE_CLIENT_ID) {
+      return reply.code(503).send({ error: 'Login com Google indisponivel no momento.' });
+    }
+
+    const parsed = GoogleAuthSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Dados invalidos' });
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: parsed.data.credential,
+        audience: env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      return reply.code(401).send({ error: 'Nao foi possivel confirmar sua conta Google.' });
+    }
+
+    const email = payload?.email?.toLowerCase();
+    const googleId = payload?.sub;
+    if (!email || !googleId || payload?.email_verified !== true) {
+      return reply.code(401).send({ error: 'Use uma conta Google com email verificado.' });
+    }
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(or(eq(users.googleId, googleId), eq(users.email, email)), eq(users.isDeleted, false)))
+      .limit(1);
+
+    if (!user) {
+      return reply.code(404).send({ error: 'Crie sua conta primeiro. Depois voce podera entrar com Google.' });
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      return reply.code(423).send({ error: 'Conta temporariamente bloqueada. Tente novamente em alguns minutos.' });
+    }
+
+    let authenticatedUser = user;
+    if (!user.googleId || !user.emailVerifiedAt) {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          googleId: user.googleId || googleId,
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          lastLoginAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id))
+        .returning();
+      authenticatedUser = updatedUser ?? user;
+    } else {
+      await db
+        .update(users)
+        .set({ failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), updatedAt: new Date() })
+        .where(eq(users.id, user.id));
+    }
+
+    const [restaurant] = await db
+      .select()
+      .from(restaurants)
+      .where(and(eq(restaurants.id, authenticatedUser.restaurantId), eq(restaurants.isDeleted, false)))
+      .limit(1);
+
+    if (!restaurant) return reply.code(403).send({ error: 'Conta indisponivel.' });
+
+    await writeAuditLog({
+      request,
+      restaurantId: authenticatedUser.restaurantId,
+      userId: authenticatedUser.id,
+      action: 'auth_google_login',
+      resourceType: 'user',
+      resourceId: authenticatedUser.id,
+      newData: { email },
+    });
+
+    const tokens = await issueTokens({ user: authenticatedUser, request });
+    reply.setCookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions(request));
+
+    return reply.send({
+      access_token: tokens.accessToken,
+      user: toUserDto(authenticatedUser),
+      restaurant: toRestaurantDto(restaurant, { developer: isDeveloperEmail(authenticatedUser.email) }),
+    });
+  });
   app.get('/auth/verify-email', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (_request, reply) => {
     return reply.redirect(new URL('/app/planos', env.FRONTEND_URL).toString());
   });

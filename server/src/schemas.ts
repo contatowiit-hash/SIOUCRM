@@ -34,6 +34,10 @@ export const LoginSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
+export const GoogleAuthSchema = z.object({
+  credential: z.string().min(100).max(5000),
+});
+
 export const ResendVerificationSchema = z.object({
   email: z.string().email().max(255).toLowerCase(),
 });
