@@ -357,6 +357,8 @@ test('cadastro bloqueia dominio de email sem DNS de email', async () => {
 
   assert.match(validator, /resolveMx/);
   assert.match(validator, /resolveMxWithTimeout/);
+  assert.match(validator, /disposable-email-domains/);
+  assert.match(validator, /isDisposableEmailDomain/);
   assert.match(validator, /emailDomainValidationTimeoutMs/);
   assert.match(validator, /blockedEmailDomains/);
   assert.match(validator, /domainCache/);
