@@ -25,3 +25,7 @@ whatsapp-gateway/**/sessions/
 supabase/.env
 .DS_Store
 Thumbs.db
+
+.vercel
+.env
+.env.local
