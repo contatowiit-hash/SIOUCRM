@@ -163,9 +163,40 @@ class ApiRequestError extends Error {
   }
 }
 
+export interface ImportPreviewResponse {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  estimatedTotal: number;
+  errors: Array<{ row: number; reason: string }>;
+  preview: Array<{
+    customer_name: string;
+    customer_phone: string;
+    ordered_at: string;
+    product: string;
+    quantity: number;
+    total_price: number;
+  }>;
+}
+
+export interface ImportOrdersResponse {
+  success: true;
+  batch_id: string;
+  imported: number;
+  customersCreated: number;
+  customersUpdated: number;
+  duplicatesSkipped: number;
+  invalidRows: number;
+  errors: number;
+  errorDetails: Array<{ product: string; reason: string }>;
+}
+
 const apiFetchOnce = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -186,6 +217,27 @@ const apiFetchOnce = async <T>(path: string, init: RequestInit = {}): Promise<T>
   }
 
   return response.json() as Promise<T>;
+};
+
+const apiBlobOnce = async (path: string, init: RequestInit = {}): Promise<Blob> => {
+  const headers = new Headers(init.headers);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers,
+    credentials: 'include',
+  }).catch(() => {
+    throw new Error('Backend local desligado. Abra o inicializador do sistema e deixe a janela aberta.');
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (response.status === 401) throw new ApiRequestError(body?.error || 'Unauthorized', response.status);
+    throw new Error(body?.error || 'Não foi possível baixar o arquivo.');
+  }
+
+  return response.blob();
 };
 
 const refreshAccessToken = async () => {
@@ -224,6 +276,34 @@ const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => 
     try {
       await refreshAccessToken();
       return await apiFetchOnce<T>(path, init);
+    } catch {
+      setAccessToken(null);
+      throw new Error('Sessão expirada. Entre novamente.');
+    }
+  }
+};
+
+const apiBlob = async (path: string, init: RequestInit = {}): Promise<Blob> => {
+  try {
+    return await apiBlobOnce(path, init);
+  } catch (error) {
+    const canRefresh =
+      error instanceof ApiRequestError &&
+      error.status === 401 &&
+      path !== '/auth/login' &&
+      path !== '/auth/refresh' &&
+      path !== '/auth/logout';
+
+    if (!canRefresh) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        throw new Error('Sessão expirada. Entre novamente.');
+      }
+      throw error;
+    }
+
+    try {
+      await refreshAccessToken();
+      return await apiBlobOnce(path, init);
     } catch {
       setAccessToken(null);
       throw new Error('Sessão expirada. Entre novamente.');
@@ -296,6 +376,19 @@ export const api = {
   },
   async currentPlan() {
     return apiFetch<PlanCurrentResponse>('/plan/current');
+  },
+  async previewOrderImport(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return apiFetch<ImportPreviewResponse>('/import/preview', { method: 'POST', body: form });
+  },
+  async importOrders(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return apiFetch<ImportOrdersResponse>('/import/orders', { method: 'POST', body: form });
+  },
+  async downloadOrderImportTemplate() {
+    return apiBlob('/import/template');
   },
   async customers() {
     return apiFetch<{ data: Customer[] }>('/customers');

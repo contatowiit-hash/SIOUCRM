@@ -2,6 +2,7 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './env.js';
 import { authPlugin } from './plugins/auth.js';
@@ -17,6 +18,7 @@ import { reservationRoutes } from './routes/reservations.js';
 import { usageRoutes } from './routes/usage.js';
 import { whatsappRoutes } from './routes/whatsapp.js';
 import { integrationRoutes } from './routes/integrations.js';
+import { importRoutes } from './routes/import.js';
 import { integrationWebhookRoutes } from './routes/webhooks/integrations.js';
 import { stripeWebhookRoute } from './routes/webhooks/stripe.js';
 import { whatsappGatewayWebhookRoutes } from './routes/webhooks/whatsapp.js';
@@ -102,6 +104,12 @@ export const buildApp = async () => {
   });
 
   await app.register(cookie);
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+      files: 1,
+    },
+  });
 
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('Permissions-Policy', permissionsPolicy);
@@ -134,6 +142,7 @@ export const buildApp = async () => {
   app.register(orderRoutes, { prefix: '/api' });
   app.register(planRoutes, { prefix: '/api' });
   app.register(usageRoutes, { prefix: '/api' });
+  app.register(importRoutes, { prefix: '/api' });
   app.register(campaignRoutes, { prefix: '/api' });
   app.register(whatsappRoutes, { prefix: '/api' });
   app.register(integrationRoutes, { prefix: '/api' });

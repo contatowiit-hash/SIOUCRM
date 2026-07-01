@@ -246,6 +246,61 @@ export const orderItems = pgTable(
   }),
 );
 
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    restaurantId: uuid('restaurant_id')
+      .notNull()
+      .references(() => restaurants.id, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    totalRows: integer('total_rows').notNull().default(0),
+    validRows: integer('valid_rows').notNull().default(0),
+    duplicateRows: integer('duplicate_rows').notNull().default(0),
+    invalidRows: integer('invalid_rows').notNull().default(0),
+    importedRows: integer('imported_rows').notNull().default(0),
+    customersCreated: integer('customers_created').notNull().default(0),
+    customersUpdated: integer('customers_updated').notNull().default(0),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => ({
+    restaurantIdx: index('import_batches_restaurant_id_idx').on(table.restaurantId, table.createdAt),
+  }),
+);
+
+export const importedOrders = pgTable(
+  'imported_orders',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    restaurantId: uuid('restaurant_id')
+      .notNull()
+      .references(() => restaurants.id, { onDelete: 'cascade' }),
+    customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    importBatchId: uuid('import_batch_id').references(() => importBatches.id, { onDelete: 'cascade' }),
+    rowHash: text('row_hash').notNull(),
+    customerName: text('customer_name').notNull(),
+    customerPhone: text('customer_phone').notNull(),
+    orderedAt: timestamp('ordered_at', { withTimezone: true }).notNull(),
+    product: text('product').notNull(),
+    category: text('category'),
+    quantity: integer('quantity').notNull(),
+    unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
+    totalPrice: numeric('total_price', { precision: 12, scale: 2 }).notNull(),
+    paymentMethod: text('payment_method'),
+    status: text('status'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    restaurantIdx: index('imported_orders_restaurant_id_idx').on(table.restaurantId, table.orderedAt),
+    batchIdx: index('imported_orders_batch_id_idx').on(table.importBatchId),
+    rowHashIdx: uniqueIndex('imported_orders_restaurant_row_hash_idx').on(table.restaurantId, table.rowHash),
+  }),
+);
+
 export const paymentConnections = pgTable(
   'payment_connections',
   {

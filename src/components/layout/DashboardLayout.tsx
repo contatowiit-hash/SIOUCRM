@@ -12,6 +12,7 @@ import {
   Package,
   Settings,
   ShoppingBag,
+  Upload,
   Users,
   Workflow,
   Search,
@@ -26,8 +27,9 @@ import { cn } from '../../lib/cn';
 
 type MenuRole = 'owner' | 'admin' | 'manager' | 'agent';
 const allRoles: MenuRole[] = ['owner', 'admin', 'manager', 'agent'];
+type MenuItem = { label: string; to: string; icon: typeof Gauge; roles: MenuRole[]; hiddenInDemo?: boolean };
 
-const menu = [
+const menu: Array<{ label: string; items: MenuItem[] }> = [
   {
     label: 'Principal',
     items: [
@@ -35,6 +37,7 @@ const menu = [
       { label: 'Clientes', to: 'clientes', icon: Users, roles: allRoles },
       { label: 'Reservas', to: 'reservas', icon: CalendarDays, roles: ['owner', 'admin', 'manager'] as MenuRole[] },
       { label: 'Pedidos', to: 'pedidos', icon: ShoppingBag, roles: ['owner', 'admin', 'manager'] as MenuRole[] },
+      { label: 'Importar pedidos', to: 'importar-pedidos', icon: Upload, roles: ['owner', 'admin', 'manager'] as MenuRole[], hiddenInDemo: true },
     ],
   },
   {
@@ -112,7 +115,8 @@ export const DashboardLayout = () => {
       ...section,
       items: section.items.filter((item) => {
         if (planLocked) return item.to === 'meu-plano' || (item.to === 'planos' && profile?.role === 'owner');
-        return demoMode || Boolean(profile?.role && item.roles.includes(profile.role));
+        if (demoMode) return !item.hiddenInDemo;
+        return Boolean(profile?.role && item.roles.includes(profile.role));
       }),
     }))
     .filter((section) => section.items.length > 0);

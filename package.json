@@ -15,10 +15,11 @@
     "build:api": "tsc -p server/tsconfig.json",
     "db:migrate": "tsx server/src/scripts/migrate.ts",
     "test:menu-pdf": "node --import tsx --test server/src/__tests__/menu-pdf.test.ts",
+    "test:import-orders": "node --import tsx --test server/src/__tests__/import-orders.test.ts",
     "test:metered": "node --import tsx --test server/src/__tests__/metered-billing.test.ts",
     "test:security": "node --import tsx --test server/src/__tests__/security.test.ts",
     "test:integrations": "node --import tsx --test server/src/__tests__/integrations.test.ts server/src/__tests__/remaining-payments.test.ts",
-    "test": "npm run test:menu-pdf && npm run test:metered && npm run test:security && npm run test:integrations",
+    "test": "npm run test:menu-pdf && npm run test:import-orders && npm run test:metered && npm run test:security && npm run test:integrations",
     "preview": "vite preview --host 127.0.0.1 --configLoader native",
     "lint": "eslint ."
   },
@@ -26,6 +27,7 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
     "@hookform/resolvers": "^3.9.1",
     "@napi-rs/canvas": "^0.1.80",
@@ -36,6 +38,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
     "fastify": "^5.8.5",
     "jose": "^6.2.3",
     "lucide-react": "^0.468.0",
@@ -44,6 +47,7 @@
     "postgres": "^3.4.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-dropzone": "^15.0.0",
     "react-hook-form": "^7.54.2",
     "react-router-dom": "^7.1.1",
     "recharts": "^3.8.1",
@@ -69,5 +73,8 @@
     "typescript": "~5.6.3",
     "typescript-eslint": "^8.60.0",
     "vite": "^6.0.7"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

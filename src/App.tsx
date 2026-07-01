@@ -12,6 +12,7 @@ import { CustomersPage } from './pages/CustomersPage';
 import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { ReservationsPage } from './pages/ReservationsPage';
 import { OrdersPage } from './pages/OrdersPage';
+import { ImportOrdersPage } from './pages/ImportOrdersPage';
 import { CampaignsPage } from './pages/CampaignsPage';
 import { PlanPage } from './pages/PlanPage';
 import { WhatsAppPage } from './pages/WhatsAppPage';
@@ -40,7 +41,7 @@ const RequirePaidPlan = ({ children }: { children: ReactNode }) => {
   return hasAccess ? <>{children}</> : <Navigate to="/app/planos" replace />;
 };
 
-const privateRoutes = (
+const privateRoutes = (options: { importOrders?: boolean } = {}) => (
   <>
     <Route index element={<Navigate to="planos" replace />} />
     <Route path="dashboard" element={<RequirePaidPlan><DashboardPage /></RequirePaidPlan>} />
@@ -48,6 +49,7 @@ const privateRoutes = (
     <Route path="clientes/:customerId" element={<RequirePaidPlan><CustomerProfilePage /></RequirePaidPlan>} />
     <Route path="reservas" element={<RequirePaidPlan><ReservationsPage /></RequirePaidPlan>} />
     <Route path="pedidos" element={<RequirePaidPlan><OrdersPage /></RequirePaidPlan>} />
+    {options.importOrders ? <Route path="importar-pedidos" element={<RequirePaidPlan><ImportOrdersPage /></RequirePaidPlan>} /> : null}
     <Route path="campanhas" element={<RequirePaidPlan><CampaignsPage /></RequirePaidPlan>} />
     <Route path="aniversarios" element={<Navigate to="../meu-plano" replace />} />
     <Route path="meu-plano" element={<PlanPage />} />
@@ -77,10 +79,10 @@ function App() {
           </ProtectedRoute>
         }
       >
-        {privateRoutes}
+        {privateRoutes({ importOrders: true })}
       </Route>
       <Route path="/demo" element={<DashboardLayout />}>
-        {privateRoutes}
+        {privateRoutes()}
       </Route>
       <Route path="/404" element={<NotFoundPage />} />
       <Route path="*" element={<NotFoundPage />} />
